@@ -6,14 +6,15 @@ import ChatMessages from "./chat-messages";
 import ChatInput from "./chat-input";
 import ChatSidebar from "./chat-sidebar";
 import type { Message } from "./types";
+import { askAI } from "@/services/ai/askAI";
 
 const SUGGESTIONS = [
-  "What are the benefits of chamomile?",
+  "Am I eligible for medical cannabis?",
+  "Recommend herbs for a headache",
+  "What is Myrcene and what doies it do?",
+  "What are the benefits of ginger?",
   "Natural ways to boost my immune system",
   "Remedies for an upset stomach",
-  "How can I reduce stress naturally?",
-  "Herbal teas for better digestion",
-  "Tell me about aromatherapy",
 ];
 
 export default function ChatSection() {
@@ -21,7 +22,7 @@ export default function ChatSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleQuestionClick = (question: string) => {
+  const handleQuestionClick = async (question: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       content: question,
@@ -31,48 +32,42 @@ export default function ChatSection() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await askAI({ question });
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `I'll help you with: ${question}. This is a simulated response.`,
+        content: response?.answer || "Sorry, I couldn't get a response.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content:
+          "Something went wrong while fetching the response. Please try again.",
         role: "assistant",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSendMessage = (content: string) => {
-    if (!content.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      role: "user",
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `Thanks for your message: "${content}". This is a simulated response.`,
-        role: "assistant",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1000);
+  // ✅ Input is now disabled
+  const handleSendMessage = (_content: string) => {
+    // Disabled intentionally
+    return;
   };
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = messages?.length > 0;
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
+      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-40 w-[80%] md:relative md:z-auto md:w-[30%] xl:w-[20%] flex-col border-r border-border overflow-hidden transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
@@ -88,7 +83,7 @@ export default function ChatSection() {
         />
       )}
 
-      {/* Main chat area */}
+      {/* Main Chat Area */}
       <div
         className={`flex flex-1 flex-col h-full w-full ${
           hasMessages ? "md:w-[70%] xl:w-[80%]" : "w-full"
@@ -129,6 +124,7 @@ export default function ChatSection() {
                 </p>
               </div>
 
+              {/* Suggestions (Mobile View) */}
               <div className="w-full max-w-2xl lg:hidden">
                 <h2 className="mb-4 text-lg font-semibold text-foreground text-left">
                   Suggestions
@@ -138,7 +134,8 @@ export default function ChatSection() {
                     <button
                       key={suggestion}
                       onClick={() => handleQuestionClick(suggestion)}
-                      className="w-full rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/20"
+                      className="w-full rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/20 disabled:opacity-50"
+                      disabled={isLoading}
                     >
                       {suggestion}
                     </button>
@@ -151,9 +148,11 @@ export default function ChatSection() {
           )}
         </div>
 
-        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        {/* ✅ Input disabled */}
+        <ChatInput onSendMessage={handleSendMessage} isLoading={true} />
       </div>
 
+      {/* Suggestions (Desktop View) */}
       {messages.length === 0 && (
         <div className="hidden lg:flex lg:w-1/3 flex-col overflow-hidden bg-primary/20 border-l border-border">
           <div className="flex-1 overflow-y-auto p-6">
@@ -165,7 +164,8 @@ export default function ChatSection() {
                 <button
                   key={suggestion}
                   onClick={() => handleQuestionClick(suggestion)}
-                  className="w-full rounded-full border border-primary/30 bg-primary/10 px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/20"
+                  className="w-full rounded-full border border-primary/30 bg-primary/10 px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/20 disabled:opacity-50"
+                  disabled={isLoading}
                 >
                   {suggestion}
                 </button>
