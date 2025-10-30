@@ -16,6 +16,7 @@ interface ChatSidebarProps {
   onNewConversation?: () => void;
   onConversationClick?: () => void;
   onEmptyConversations?: () => void;
+  isLoading?: boolean;
 }
 
 export default function ChatSidebar({
@@ -23,6 +24,7 @@ export default function ChatSidebar({
   onNewConversation,
   onConversationClick,
   onEmptyConversations,
+  isLoading,
 }: ChatSidebarProps) {
   const dispatch = useDispatch<AppDispatch>();
   const conversations = useAppSelector((state) => state.conversations.list);
@@ -81,7 +83,8 @@ export default function ChatSidebar({
       <div className="border-b border-sidebar-border p-4">
         <button
           onClick={handleNewConversation}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition-all hover:opacity-90"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
+          disabled={isLoading}
         >
           <Plus size={18} />
           New conversation

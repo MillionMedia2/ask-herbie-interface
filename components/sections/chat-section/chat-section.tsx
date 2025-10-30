@@ -180,6 +180,7 @@ export default function ChatSection() {
             setSidebarOpen(false);
             setShowSuggestions(true);
           }}
+          isLoading={isLoading}
         />
       </div>
 
