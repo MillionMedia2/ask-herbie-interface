@@ -1,30 +1,36 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ArrowUp } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ArrowUp } from "lucide-react";
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void
-  isLoading: boolean
+  onSendMessage: (message: string) => void;
+  isLoading: boolean;
 }
 
-export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
-  const [input, setInput] = useState("")
+export default function ChatInput({
+  onSendMessage,
+  isLoading,
+}: ChatInputProps) {
+  const [input, setInput] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (input.trim()) {
-      onSendMessage(input)
-      setInput("")
+      onSendMessage(input);
+      setInput("");
     }
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-border bg-card px-4 sm:px-6 py-4 flex-shrink-0">
+    <form
+      onSubmit={handleSubmit}
+      className="border-t border-border bg-card px-4 sm:px-6 py-4 flex-shrink-0"
+    >
       <div className="flex gap-2">
         <Input
           value={input}
@@ -43,8 +49,9 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
         </Button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Herbie is AI-generated and may contain mistakes. This is not professional advice.
+        Herbie is AI-generated and may contain mistakes. This is not
+        professional advice.
       </p>
     </form>
-  )
+  );
 }

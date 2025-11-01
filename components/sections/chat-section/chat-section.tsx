@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useDispatch } from "react-redux";
 import ChatHeader from "./chat-header";
 import ChatMessages from "./chat-messages";
 import ChatInput from "./chat-input";
 import ChatSidebar from "./chat-sidebar";
-import type { Message } from "./types";
 import { askAI } from "@/services/ai/askAI";
+import {
+  addConversation,
+  setActiveConversation,
+} from "@/redux/features/conversations-slice";
+import { addMessage } from "@/redux/features/messages-slice";
+import { useAppSelector } from "@/redux/store";
+import type { AppDispatch } from "@/redux/store";
 
 const SUGGESTIONS = [
   "Am I eligible for medical cannabis?",
@@ -18,49 +25,138 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatSection() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const dispatch = useDispatch<AppDispatch>();
+  const activeConversationId = useAppSelector(
+    (state) => state.conversations.activeConversationId
+  );
+  const conversations = useAppSelector((state) => state.conversations.list);
+  const messages = useAppSelector((state) =>
+    activeConversationId
+      ? state.messages.byConversation[activeConversationId] || []
+      : []
+  );
+
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true); // ✅ new state
+
+  const getConversationTitle = (text: string): string => {
+    const words = text.split(" ").slice(0, 5).join(" ");
+    return words.length > 50 ? words.substring(0, 50) + "..." : words;
+  };
 
   const handleQuestionClick = async (question: string) => {
-    const userMessage: Message = {
+    setShowSuggestions(false); // ✅ hide suggestions when sending
+    const conversationId = Date.now().toString();
+    const conversationTitle = getConversationTitle(question);
+
+    dispatch(
+      addConversation({
+        id: conversationId,
+        title: conversationTitle,
+        participants: ["user", "assistant"],
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    dispatch(setActiveConversation(conversationId));
+    setSidebarOpen(false);
+
+    const userMessage = {
       id: Date.now().toString(),
+      conversationId,
+      senderId: "user",
       content: question,
-      role: "user",
-      timestamp: new Date(),
+      createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+
+    dispatch(addMessage(userMessage));
     setIsLoading(true);
 
     try {
       const response = await askAI({ question });
 
-      const aiMessage: Message = {
+      const aiMessage = {
         id: (Date.now() + 1).toString(),
+        conversationId,
+        senderId: "assistant",
         content: response?.answer || "Sorry, I couldn't get a response.",
-        role: "assistant",
-        timestamp: new Date(),
+        createdAt: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
+      dispatch(addMessage(aiMessage));
     } catch (error) {
-      const aiMessage: Message = {
+      const aiMessage = {
         id: (Date.now() + 1).toString(),
+        conversationId,
+        senderId: "assistant",
         content:
           "Something went wrong while fetching the response. Please try again.",
-        role: "assistant",
-        timestamp: new Date(),
+        createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, aiMessage]);
+      dispatch(addMessage(aiMessage));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ✅ Input is now disabled
-  const handleSendMessage = (_content: string) => {
-    // Disabled intentionally
-    return;
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim()) return;
+
+    setIsLoading(true);
+    setShowSuggestions(false); // ✅ hide suggestions when sending
+    let conversationId = activeConversationId;
+
+    if (!conversationId) {
+      conversationId = Date.now().toString();
+      const conversationTitle = getConversationTitle(content);
+
+      dispatch(
+        addConversation({
+          id: conversationId,
+          title: conversationTitle,
+          participants: ["user", "assistant"],
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      dispatch(setActiveConversation(conversationId));
+    }
+
+    const userMessage = {
+      id: Date.now().toString(),
+      conversationId,
+      senderId: "user",
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    dispatch(addMessage(userMessage));
+
+    try {
+      const response = await askAI({ question: content });
+
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        conversationId,
+        senderId: "assistant",
+        content: response?.answer || "Sorry, I couldn't get a response.",
+        createdAt: new Date().toISOString(),
+      };
+
+      dispatch(addMessage(aiMessage));
+    } catch (error) {
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        conversationId,
+        senderId: "assistant",
+        content:
+          "Something went wrong while fetching the response. Please try again.",
+        createdAt: new Date().toISOString(),
+      };
+      dispatch(addMessage(aiMessage));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const hasMessages = messages?.length > 0;
@@ -71,9 +167,21 @@ export default function ChatSection() {
       <div
         className={`fixed inset-y-0 left-0 z-40 w-[80%] md:relative md:z-auto md:w-[30%] xl:w-[20%] flex-col border-r border-border overflow-hidden transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        } ${hasMessages ? "flex" : "md:hidden"}`}
+        } ${hasMessages || showSuggestions ? "flex" : "md:hidden"}`}
       >
-        <ChatSidebar onClose={() => setSidebarOpen(false)} />
+        <ChatSidebar
+          onClose={() => setSidebarOpen(false)}
+          onNewConversation={() => {
+            setShowSuggestions(true);
+            setSidebarOpen(true);
+          }}
+          onConversationClick={() => setShowSuggestions(false)}
+          onEmptyConversations={() => {
+            setSidebarOpen(false);
+            setShowSuggestions(true);
+          }}
+          isLoading={isLoading}
+        />
       </div>
 
       {sidebarOpen && (
@@ -95,7 +203,7 @@ export default function ChatSection() {
           className="flex-1 overflow-y-auto"
           style={{ height: "calc(100vh - 64px)" }}
         >
-          {messages.length === 0 ? (
+          {showSuggestions ? (
             <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 overflow-y-auto">
               <div className="mb-8 text-center max-w-2xl">
                 <div className="mb-6 flex justify-center">
@@ -148,12 +256,10 @@ export default function ChatSection() {
           )}
         </div>
 
-        {/* ✅ Input disabled */}
-        <ChatInput onSendMessage={handleSendMessage} isLoading={true} />
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
 
-      {/* Suggestions (Desktop View) */}
-      {messages.length === 0 && (
+      {showSuggestions && (
         <div className="hidden lg:flex lg:w-1/3 flex-col overflow-hidden bg-primary/20 border-l border-border">
           <div className="flex-1 overflow-y-auto p-6">
             <h2 className="mb-6 text-xl font-semibold text-foreground">
