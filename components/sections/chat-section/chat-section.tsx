@@ -256,7 +256,7 @@ export default function ChatSection() {
           )}
         </div>
 
-        <ChatInput onSendMessage={handleSendMessage} isLoading={true} />
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
 
       {showSuggestions && (
