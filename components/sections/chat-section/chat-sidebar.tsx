@@ -43,14 +43,13 @@ export default function ChatSidebar({
     dispatch(clearMessages(id));
 
     if (conversations.length === 1) {
-      // ✅ last conversation removed
       dispatch(setActiveConversation(null));
       onEmptyConversations?.();
     } else {
       if (activeConversationId === id) {
         dispatch(setActiveConversation(null));
       }
-      onNewConversation?.(); // keep suggestions open if others remain
+      onNewConversation?.();
     }
 
     onClose?.();
@@ -58,7 +57,7 @@ export default function ChatSidebar({
 
   const handleConversationClick = (id: string) => {
     dispatch(setActiveConversation(id));
-    onConversationClick?.(); // ✅ close suggestions
+    onConversationClick?.();
   };
 
   const handleNewConversation = () => {
@@ -68,7 +67,7 @@ export default function ChatSidebar({
   };
 
   return (
-    <div className="flex w-full flex-col border-r border-border bg-sidebar text-sidebar-foreground h-full">
+    <div className="flex w-full flex-col text-sidebar-foreground h-full">
       <div className="flex items-center justify-between border-b border-sidebar-border p-4 md:hidden">
         <h3 className="font-semibold text-sidebar-foreground">Conversations</h3>
         <button
@@ -80,7 +79,7 @@ export default function ChatSidebar({
         </button>
       </div>
 
-      <div className="border-b border-sidebar-border p-4">
+      <div className="p-4">
         <button
           onClick={handleNewConversation}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
@@ -91,7 +90,7 @@ export default function ChatSidebar({
         </button>
       </div>
 
-      <div className="border-b border-sidebar-border p-4">
+      <div className="px-4">
         <div className="relative">
           <Search
             size={16}
@@ -110,7 +109,7 @@ export default function ChatSidebar({
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           <h3 className="mb-3 text-sm font-semibold text-sidebar-foreground">
-            Saved
+            Saved Chats
           </h3>
 
           {filteredConversations.length === 0 ? (
