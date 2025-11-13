@@ -10,6 +10,7 @@ interface Props {
   showSuggestions: boolean;
   onSendMessage: (content: string) => void;
   onToggleSidebar: () => void;
+  animatingMessageId: string | null;
 }
 
 export default function ChatMainCard({
@@ -18,6 +19,7 @@ export default function ChatMainCard({
   showSuggestions,
   onSendMessage,
   onToggleSidebar,
+  animatingMessageId,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
@@ -32,15 +34,19 @@ export default function ChatMainCard({
         {showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">
-              Hey there, I’m Herbie
+              Hey there, I'm Herbie
             </h2>
             <p className="max-w-md text-sm leading-relaxed">
-              I’m your AI natural remedy companion. Ask me anything about
+              I'm your AI natural remedy companion. Ask me anything about
               remedies, recommendations, or support.
             </p>
           </div>
         ) : (
-          <ChatMessages messages={messages} isLoading={isLoading} />
+          <ChatMessages
+            messages={messages}
+            isLoading={isLoading}
+            animatingMessageId={animatingMessageId}
+          />
         )}
       </div>
 

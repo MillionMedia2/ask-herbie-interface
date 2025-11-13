@@ -29,7 +29,7 @@ export default function ChatInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-border bg-card px-4 sm:px-6 py-4 flex-shrink-0"
+      className="border-tborder-[#D0D0D0] bg-card px-4 sm:px-6 py-4 flex-shrink-0"
     >
       <div className="flex gap-2">
         <Input
@@ -37,7 +37,7 @@ export default function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask me anything (e.g. natural remedies for anxiety)"
           disabled={isLoading}
-          className="flex-1 text-sm sm:text-base"
+          className="flex-1 text-sm sm:text-base border border-[#D0D0D0] dark:border-border "
         />
         <Button
           type="submit"
