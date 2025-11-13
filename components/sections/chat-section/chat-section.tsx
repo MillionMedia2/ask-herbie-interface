@@ -28,6 +28,10 @@ export default function ChatSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  // Track the ID of the message that should animate
+  const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(
+    null
+  );
 
   // Hide suggestions when there's an active conversation with messages
   useEffect(() => {
@@ -69,18 +73,21 @@ export default function ChatSection() {
 
     try {
       const response = await askAI({ question });
-      console.log(response);
+      const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: aiMessageId,
         conversationId,
         senderId: "assistant",
         content: response?.answer || "Sorry, I couldn't get a response.",
         createdAt: new Date().toISOString(),
       };
       dispatch(addMessage(aiMessage));
+      // Set this message to animate
+      setAnimatingMessageId(aiMessageId);
     } catch (error) {
+      const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: aiMessageId,
         conversationId,
         senderId: "assistant",
         content:
@@ -88,6 +95,7 @@ export default function ChatSection() {
         createdAt: new Date().toISOString(),
       };
       dispatch(addMessage(aiMessage));
+      setAnimatingMessageId(aiMessageId);
     } finally {
       setIsLoading(false);
     }
@@ -126,17 +134,21 @@ export default function ChatSection() {
     try {
       const response = await askAI({ question: content });
       console.log(response);
+      const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: aiMessageId,
         conversationId,
         senderId: "assistant",
         content: response?.answer || "Sorry, I couldn't get a response.",
         createdAt: new Date().toISOString(),
       };
       dispatch(addMessage(aiMessage));
+      // Set this message to animate
+      setAnimatingMessageId(aiMessageId);
     } catch {
+      const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: aiMessageId,
         conversationId,
         senderId: "assistant",
         content:
@@ -144,6 +156,7 @@ export default function ChatSection() {
         createdAt: new Date().toISOString(),
       };
       dispatch(addMessage(aiMessage));
+      setAnimatingMessageId(aiMessageId);
     } finally {
       setIsLoading(false);
     }
@@ -153,11 +166,15 @@ export default function ChatSection() {
     dispatch(setActiveConversation(null));
     setShowSuggestions(true);
     setSidebarOpen(false);
+    // Clear animating message when starting new conversation
+    setAnimatingMessageId(null);
   };
 
   const handleConversationClick = () => {
     // Suggestions will be hidden by useEffect when messages load
     setSidebarOpen(false);
+    // Clear animating message when switching conversations
+    setAnimatingMessageId(null);
   };
 
   const hasMessages = messages?.length > 0;
@@ -203,6 +220,7 @@ export default function ChatSection() {
           showSuggestions={showSuggestions}
           onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          animatingMessageId={animatingMessageId}
         />
       </div>
 
