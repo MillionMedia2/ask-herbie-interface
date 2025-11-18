@@ -1,12 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-
-export interface IMessage {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  content: string;
-  createdAt: string;
-}
+import { IMessage } from "@/types";
 
 interface MessagesState {
   byConversation: Record<string, IMessage[]>;

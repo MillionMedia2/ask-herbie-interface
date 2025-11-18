@@ -16,6 +16,8 @@ interface Product {
   stock_status?: "instock" | "outofstock" | string;
   on_sale?: boolean;
   images?: Array<{ src: string }>;
+  brand?: string;
+  category?: string;
 }
 
 interface ProductsCarouselProps {
@@ -111,10 +113,10 @@ export default function ProductsCarousel({
           {products.map((product) => (
             <div
               key={product.id}
-              className="flex-shrink-0 snap-start w-[85%] sm:w-72 md:w-64 bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="flex-shrink-0 snap-start w-[85%] sm:w-72 md:w-64 bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
               {/* Image */}
-              <div className="bg-muted aspect-square flex items-center justify-center overflow-hidden relative">
+              <div className="relative bg-muted aspect-square flex items-center justify-center overflow-hidden">
                 {product.images?.[0]?.src ? (
                   <img
                     src={product.images[0].src}
@@ -128,10 +130,17 @@ export default function ProductsCarousel({
                     </span>
                   </div>
                 )}
+
+                {/* Brand badge */}
+                {product.brand && (
+                  <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded-lg backdrop-blur">
+                    {product.brand}
+                  </span>
+                )}
               </div>
 
               {/* Product Info */}
-              <div className="p-4 flex flex-col justify-between h-48">
+              <div className="p-4 flex flex-col justify-between h-44">
                 <div>
                   <a
                     href={product.permalink}
@@ -139,33 +148,38 @@ export default function ProductsCarousel({
                     rel="noopener noreferrer"
                     className="block"
                   >
-                    <h4 className="font-medium text-sm text-foreground line-clamp-2 hover:text-primary transition-colors">
+                    <h4 className="font-semibold text-sm text-foreground line-clamp-2 hover:text-primary transition-colors">
                       {product.name}
                     </h4>
                   </a>
+
+                  {/* Category */}
+                  {product.category && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {product.category}
+                    </p>
+                  )}
 
                   {/* Price */}
                   <div className="mt-2">
                     {product.on_sale && product.sale_price ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-semibold text-primary">
+                        <span className="text-base font-bold text-primary">
                           ${product.sale_price}
                         </span>
-                        {product.regular_price && (
-                          <span className="text-xs text-muted-foreground line-through">
-                            ${product.regular_price}
-                          </span>
-                        )}
+                        <span className="text-xs text-muted-foreground line-through">
+                          ${product.regular_price}
+                        </span>
                       </div>
                     ) : (
-                      <span className="text-base font-semibold text-foreground">
-                        {product.price || "Contact for price"}
+                      <span className="text-base font-bold text-foreground">
+                        ${product.price}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Stock Status + Button */}
+                {/* Stock + CTA */}
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                   <span
                     className={cn(

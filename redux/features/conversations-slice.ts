@@ -1,12 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-
-export interface IConversation {
-  id: string;
-  title: string;
-  participants: string[];
-  lastMessage?: string;
-  updatedAt: string;
-}
+import { IConversation } from "@/types";
 
 interface ConversationsState {
   list: IConversation[];

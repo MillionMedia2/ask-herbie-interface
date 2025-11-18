@@ -7,37 +7,14 @@ import { Sparkles } from "lucide-react";
 import type { Message } from "./types";
 import { fetchProducts } from "@/services/ai/fetchProducts";
 import { isActionError } from "@/lib/error";
-
-interface Product {
-  id: number;
-  name: string;
-  slug?: string;
-  permalink: string;
-  price: string;
-  regular_price?: string;
-  sale_price?: string;
-  stock_quantity?: number | null;
-  stock_status?: "instock" | "outofstock" | string;
-  on_sale?: boolean;
-  category?: string;
-  brand?: string;
-  images?: Array<{ id?: number; src: string }>;
-}
-
+import { Product } from "@/types";
+import { THINKING_TEXTS } from "@/constants/thinking-text";
 interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
   animatingMessageId: string | null;
   onProductsVisibilityChange?: (visible: boolean) => void;
 }
-
-const THINKING_TEXTS = [
-  "Thinking...",
-  "Finding the best answer...",
-  "Analyzing your question...",
-  "Gathering insights...",
-  "Almost there...",
-];
 
 export default function ChatMessages({
   messages,
@@ -55,7 +32,6 @@ export default function ChatMessages({
     products: Product[];
   } | null>(null);
   const [loadingProducts, setLoadingProducts] = useState(false);
-
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,13 +89,7 @@ export default function ChatMessages({
     setTimeout(() => {
       setShowProducts(false);
       setProductsData(null);
-    }, 500); // Match the animation duration
-  };
-
-  const isLastAssistantMessage = (index: number) => {
-    return (
-      messages[index].senderId === "assistant" && index === messages.length - 1
-    );
+    }, 500);
   };
 
   return (
@@ -145,8 +115,7 @@ export default function ChatMessages({
           );
         })}
 
-        {/* Show "Recommended Products" button after the last assistant message */}
-        {/* {messages.length > 0 &&
+        {messages.length > 0 &&
           !isLoading &&
           messages[messages.length - 1].senderId === "assistant" &&
           !showProducts && (
@@ -171,7 +140,7 @@ export default function ChatMessages({
                   : "View Recommended Products"}
               </button>
             </div>
-          )} */}
+          )}
 
         {/* Products Carousel - appears after all messages */}
         {showProducts && productsData && (
@@ -229,7 +198,6 @@ export default function ChatMessages({
                 />
               </div>
 
-              {/* Dynamic thinking text */}
               <p className="text-xs text-muted-foreground italic">
                 {thinkingText}
               </p>
