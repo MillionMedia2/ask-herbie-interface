@@ -7,12 +7,12 @@ import type { AppDispatch } from "@/redux/store";
 import ChatSidebar from "./chat-sidebar";
 import ChatMainCard from "./chat-main-card";
 import ChatSuggestionsCard from "./chat-suggestion-card";
-import { askAI } from "@/services/ai/askAI";
+import { askAIStream } from "@/services/ai/askAIStream";
 import {
   addConversation,
   setActiveConversation,
 } from "@/redux/features/conversations-slice";
-import { addMessage } from "@/redux/features/messages-slice";
+import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
@@ -28,12 +28,10 @@ export default function ChatSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  // Track the ID of the message that should animate
-  const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
     null
   );
 
-  // Hide suggestions when there's an active conversation with messages
   useEffect(() => {
     if (activeConversationId && messages.length > 0) {
       setShowSuggestions(false);
@@ -71,34 +69,60 @@ export default function ChatSection() {
     dispatch(addMessage(userMessage));
     setIsLoading(true);
 
-    try {
-      const response = await askAI({ question });
-      const aiMessageId = (Date.now() + 1).toString();
-      const aiMessage = {
-        id: aiMessageId,
-        conversationId,
-        senderId: "assistant",
-        content: response?.answer || "Sorry, I couldn't get a response.",
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(aiMessage));
-      // Set this message to animate
-      setAnimatingMessageId(aiMessageId);
-    } catch (error) {
-      const aiMessageId = (Date.now() + 1).toString();
-      const aiMessage = {
-        id: aiMessageId,
-        conversationId,
-        senderId: "assistant",
-        content:
-          "Something went wrong while fetching the response. Please try again.",
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(aiMessage));
-      setAnimatingMessageId(aiMessageId);
-    } finally {
-      setIsLoading(false);
-    }
+    // Create AI message placeholder
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage = {
+      id: aiMessageId,
+      conversationId,
+      senderId: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
+    dispatch(addMessage(aiMessage));
+    setStreamingMessageId(aiMessageId);
+
+    // Stream the response - accumulate chunks since backend sends incremental chunks
+    let accumulatedContent = "";
+    let hasReceivedFirstChunk = false;
+    await askAIStream({
+      question,
+      onChunk: (chunk: string) => {
+        accumulatedContent += chunk;
+        // Hide loader as soon as first chunk arrives
+        if (!hasReceivedFirstChunk) {
+          hasReceivedFirstChunk = true;
+          setIsLoading(false);
+        }
+        dispatch(
+          updateMessage({
+            id: aiMessageId,
+            conversationId,
+            updates: {
+              content: accumulatedContent,
+            },
+          })
+        );
+      },
+      onComplete: () => {
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      },
+      onError: (error: Error) => {
+        console.error("Streaming error:", error);
+        dispatch(
+          updateMessage({
+            id: aiMessageId,
+            conversationId,
+            updates: {
+              content:
+                "Something went wrong while fetching the response. Please try again.",
+            },
+          })
+        );
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      },
+    });
   };
 
   const handleSendMessage = async (content: string) => {
@@ -131,57 +155,76 @@ export default function ChatSection() {
     };
     dispatch(addMessage(userMessage));
 
-    try {
-      const response = await askAI({ question: content });
-      console.log(response);
-      const aiMessageId = (Date.now() + 1).toString();
-      const aiMessage = {
-        id: aiMessageId,
-        conversationId,
-        senderId: "assistant",
-        content: response?.answer || "Sorry, I couldn't get a response.",
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(aiMessage));
-      // Set this message to animate
-      setAnimatingMessageId(aiMessageId);
-    } catch {
-      const aiMessageId = (Date.now() + 1).toString();
-      const aiMessage = {
-        id: aiMessageId,
-        conversationId,
-        senderId: "assistant",
-        content:
-          "Something went wrong while fetching the response. Please try again.",
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(aiMessage));
-      setAnimatingMessageId(aiMessageId);
-    } finally {
-      setIsLoading(false);
-    }
+    // Create AI message placeholder
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage = {
+      id: aiMessageId,
+      conversationId,
+      senderId: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
+    dispatch(addMessage(aiMessage));
+    setStreamingMessageId(aiMessageId);
+
+    // Stream the response - accumulate chunks since backend sends incremental chunks
+    let accumulatedContent = "";
+    let hasReceivedFirstChunk = false;
+    await askAIStream({
+      question: content,
+      onChunk: (chunk: string) => {
+        accumulatedContent += chunk;
+        // Hide loader as soon as first chunk arrives
+        if (!hasReceivedFirstChunk) {
+          hasReceivedFirstChunk = true;
+          setIsLoading(false);
+        }
+        dispatch(
+          updateMessage({
+            id: aiMessageId,
+            conversationId,
+            updates: {
+              content: accumulatedContent,
+            },
+          })
+        );
+      },
+      onComplete: () => {
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      },
+      onError: (error: Error) => {
+        console.error("Streaming error:", error);
+        dispatch(
+          updateMessage({
+            id: aiMessageId,
+            conversationId,
+            updates: {
+              content:
+                "Something went wrong while fetching the response. Please try again.",
+            },
+          })
+        );
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      },
+    });
   };
 
   const handleNewConversation = () => {
     dispatch(setActiveConversation(null));
     setShowSuggestions(true);
     setSidebarOpen(false);
-    // Clear animating message when starting new conversation
-    setAnimatingMessageId(null);
+    setStreamingMessageId(null);
   };
 
   const handleConversationClick = () => {
-    // Suggestions will be hidden by useEffect when messages load
     setSidebarOpen(false);
-    // Clear animating message when switching conversations
-    setAnimatingMessageId(null);
+    setStreamingMessageId(null);
   };
-
-  const hasMessages = messages?.length > 0;
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden p-[5px]">
-      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 bg-background md:bg-transparent z-40 w-[80%] md:relative md:z-auto md:w-[24%] xl:w-[20%] transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
@@ -206,9 +249,8 @@ export default function ChatSection() {
         />
       )}
 
-      {/* Main Chat - Takes full width when suggestions are hidden */}
       <div
-        className={`flex-1  transition-all duration-300 ${
+        className={`flex-1 transition-all duration-300 ${
           showSuggestions
             ? "mx-[5px] md:w-[56%] xl:w-[60%]"
             : "md:w-[76%] xl:w-[80%]"
@@ -220,13 +262,12 @@ export default function ChatSection() {
           showSuggestions={showSuggestions}
           onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          animatingMessageId={animatingMessageId}
+          streamingMessageId={streamingMessageId}
         />
       </div>
 
-      {/* Suggestions - With smooth animation */}
       <div
-        className={`hidden md:block  transition-all duration-300 overflow-hidden ${
+        className={`hidden md:block transition-all duration-300 overflow-hidden ${
           showSuggestions
             ? "md:w-[28%] xl:w-[25%] opacity-100"
             : "md:w-0 opacity-0"

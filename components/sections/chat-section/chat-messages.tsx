@@ -97,6 +97,11 @@ export default function ChatMessages({
       <div className="mx-auto space-y-4">
         {messages.map((message, index) => {
           const shouldAnimate = message.id === animatingMessageId;
+          
+          // Don't render empty assistant messages (they'll show once content arrives)
+          if (message.senderId === "assistant" && !message.content.trim()) {
+            return null;
+          }
 
           return (
             <div key={message.id}>
@@ -182,7 +187,10 @@ export default function ChatMessages({
           </div>
         )}
 
-        {isLoading && (
+        {/* Only show loader if there's no streaming message with content yet */}
+        {isLoading && 
+         (!animatingMessageId || 
+          !messages.find(m => m.id === animatingMessageId)?.content.trim()) && (
           <div className="flex justify-start">
             <div className="rounded-lg bg-muted px-4 py-3 flex items-center space-x-3">
               {/* Animated dots */}
