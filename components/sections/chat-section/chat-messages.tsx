@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import ChatMessageContent from "./chat-message-content";
 import ProductsCarousel from "../products/products-carousel";
 import { Sparkles } from "lucide-react";
@@ -23,6 +23,10 @@ export default function ChatMessages({
   onProductsVisibilityChange,
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rafRef = useRef<number | null>(null);
   const [thinkingText, setThinkingText] = useState(THINKING_TEXTS[0]);
   const [showProducts, setShowProducts] = useState(false);
   const [productsVisible, setProductsVisible] = useState(false);
@@ -32,10 +36,120 @@ export default function ChatMessages({
     products: Product[];
   } | null>(null);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  // Auto-scroll
+
+  // Check if user is near the bottom of the scroll container
+  const isNearBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true;
+
+    const threshold = 100; // pixels from bottom
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
+
+  // Smooth scroll to bottom using requestAnimationFrame
+  const scrollToBottom = useCallback(
+    (force = false) => {
+      // Cancel any pending scroll
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      // Only auto-scroll if user is near bottom or forced
+      if (!force && !isNearBottom()) {
+        return;
+      }
+
+      rafRef.current = requestAnimationFrame(() => {
+        const container = scrollContainerRef.current;
+        const target = messagesEndRef.current;
+
+        if (container && target) {
+          // Calculate target scroll position
+          const targetScrollTop = target.offsetTop - container.offsetTop;
+          const currentScrollTop = container.scrollTop;
+          const distance = targetScrollTop - currentScrollTop;
+
+          // Only scroll if there's a meaningful distance
+          if (Math.abs(distance) > 1) {
+            // For small incremental updates (during streaming), use instant scroll
+            // For larger jumps, use smooth scroll
+            if (Math.abs(distance) < 50) {
+              // Small incremental update - use instant scroll for smoother streaming
+              container.scrollTop = targetScrollTop;
+            } else {
+              // Larger jump - use smooth scroll
+              container.scrollTo({
+                top: targetScrollTop,
+                behavior: "smooth",
+              });
+            }
+          }
+        }
+      });
+    },
+    [isNearBottom]
+  );
+
+  // Handle user scroll - detect if user manually scrolled up
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, productsVisible]);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      isUserScrollingRef.current = true;
+
+      // Clear existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      // Reset flag after user stops scrolling
+      scrollTimeoutRef.current = setTimeout(() => {
+        isUserScrollingRef.current = false;
+      }, 150);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-scroll when messages change (throttled for streaming)
+  useEffect(() => {
+    // Small delay to batch rapid updates during streaming
+    const timeoutId = setTimeout(() => {
+      // Only auto-scroll if user hasn't manually scrolled up
+      if (!isUserScrollingRef.current || isNearBottom()) {
+        scrollToBottom();
+      }
+    }, 50); // Small delay to batch rapid updates
+
+    return () => clearTimeout(timeoutId);
+  }, [messages, isLoading, productsVisible, scrollToBottom, isNearBottom]);
+
+  // Force scroll on initial load or when loading starts
+  useEffect(() => {
+    if (isLoading || messages.length === 0) {
+      scrollToBottom(true);
+    }
+  }, [isLoading, messages.length, scrollToBottom]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Cycle loading phrases
   useEffect(() => {
@@ -93,11 +207,11 @@ export default function ChatMessages({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-4">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-4">
       <div className="mx-auto space-y-4">
         {messages.map((message, index) => {
           const shouldAnimate = message.id === animatingMessageId;
-          
+
           // Don't render empty assistant messages (they'll show once content arrives)
           if (message.senderId === "assistant" && !message.content.trim()) {
             return null;
@@ -188,30 +302,32 @@ export default function ChatMessages({
         )}
 
         {/* Only show loader if there's no streaming message with content yet */}
-        {isLoading && 
-         (!animatingMessageId || 
-          !messages.find(m => m.id === animatingMessageId)?.content.trim()) && (
-          <div className="flex justify-start">
-            <div className="rounded-lg bg-muted px-4 py-3 flex items-center space-x-3">
-              {/* Animated dots */}
-              <div className="flex space-x-2">
-                <div className="h-2 w-2 animate-bounce rounded-full bg-foreground" />
-                <div
-                  className="h-2 w-2 animate-bounce rounded-full bg-foreground"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="h-2 w-2 animate-bounce rounded-full bg-foreground"
-                  style={{ animationDelay: "0.4s" }}
-                />
-              </div>
+        {isLoading &&
+          (!animatingMessageId ||
+            !messages
+              .find((m) => m.id === animatingMessageId)
+              ?.content.trim()) && (
+            <div className="flex justify-start">
+              <div className="rounded-lg bg-muted px-4 py-3 flex items-center space-x-3">
+                {/* Animated dots */}
+                <div className="flex space-x-2">
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-foreground" />
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-foreground"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-foreground"
+                    style={{ animationDelay: "0.4s" }}
+                  />
+                </div>
 
-              <p className="text-xs text-muted-foreground italic">
-                {thinkingText}
-              </p>
+                <p className="text-xs text-muted-foreground italic">
+                  {thinkingText}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <div ref={messagesEndRef} />
