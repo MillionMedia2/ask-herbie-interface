@@ -10,7 +10,7 @@ interface Props {
   showSuggestions: boolean;
   onSendMessage: (content: string) => void;
   onToggleSidebar: () => void;
-  animatingMessageId: string | null;
+  streamingMessageId: string | null;
 }
 
 export default function ChatMainCard({
@@ -19,7 +19,7 @@ export default function ChatMainCard({
   showSuggestions,
   onSendMessage,
   onToggleSidebar,
-  animatingMessageId,
+  streamingMessageId,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
@@ -45,7 +45,7 @@ export default function ChatMainCard({
           <ChatMessages
             messages={messages}
             isLoading={isLoading}
-            animatingMessageId={animatingMessageId}
+            animatingMessageId={streamingMessageId}
           />
         )}
       </div>

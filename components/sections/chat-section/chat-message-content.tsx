@@ -1,8 +1,7 @@
 "use client";
 
-import { useTypewriter } from "@/hooks/use-typewriter";
 import { cn } from "@/lib/utils";
-import { memo, useEffect } from "react";
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface ChatMessageContentProps {
@@ -22,22 +21,9 @@ function ChatMessageContent({
 }: ChatMessageContentProps) {
   const isAssistant = senderId === "assistant";
 
-  // Only use typewriter for assistant messages that should animate
-  const { displayedText, isComplete } = useTypewriter({
-    text: content,
-    speed: 5,
-    enabled: isAssistant && shouldAnimate,
-  });
-
-  // Notify parent when typewriter completes
-  useEffect(() => {
-    if (isComplete && onTypewriterComplete && isAssistant && shouldAnimate) {
-      onTypewriterComplete(messageId);
-    }
-  }, [isComplete, onTypewriterComplete, messageId, isAssistant, shouldAnimate]);
-
-  // Show full text for non-animated messages, typewriter text for animated ones
-  const textToShow = isAssistant && shouldAnimate ? displayedText : content;
+  // Backend is already sending words one by one, so we don't need typewriter effect
+  // Just display the content directly as it streams in
+  const textToShow = content;
 
   return (
     <div
