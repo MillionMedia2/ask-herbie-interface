@@ -8,6 +8,7 @@ import {
   setActiveConversation,
 } from "@/redux/features/conversations-slice";
 import { clearMessages } from "@/redux/features/messages-slice";
+import { clearProducts } from "@/redux/features/products-slice";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
 
@@ -41,6 +42,7 @@ export default function ChatSidebar({
   const handleDeleteConversation = (id: string) => {
     dispatch(removeConversation(id));
     dispatch(clearMessages(id));
+    dispatch(clearProducts(id));
 
     if (conversations.length === 1) {
       dispatch(setActiveConversation(null));

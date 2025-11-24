@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useDispatch } from "react-redux";
+import { useAppSelector } from "@/redux/store";
+import type { AppDispatch } from "@/redux/store";
 import ChatMessageContent from "./chat-message-content";
 import ProductsCarousel from "../products/products-carousel";
 import { Sparkles } from "lucide-react";
 import type { Message } from "./types";
 import { fetchProducts } from "@/services/ai/fetchProducts";
 import { isActionError } from "@/lib/error";
-import { Product } from "@/types";
 import { THINKING_TEXTS } from "@/constants/thinking-text";
+import {
+  addProducts,
+  setProductsVisibility,
+} from "@/redux/features/products-slice";
 interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
@@ -22,20 +28,22 @@ export default function ChatMessages({
   animatingMessageId,
   onProductsVisibilityChange,
 }: ChatMessagesProps) {
+  const dispatch = useDispatch<AppDispatch>();
+  const conversationId = messages[0]?.conversationId || null;
+  const productsListRaw = useAppSelector((state) =>
+    conversationId ? state.products.byConversation[conversationId] : undefined
+  );
+  // Ensure productsList is always an array
+  const productsList = Array.isArray(productsListRaw) ? productsListRaw : [];
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rafRef = useRef<number | null>(null);
+  const productsRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [thinkingText, setThinkingText] = useState(THINKING_TEXTS[0]);
-  const [showProducts, setShowProducts] = useState(false);
-  const [productsVisible, setProductsVisible] = useState(false);
-  const [productsData, setProductsData] = useState<{
-    category: string;
-    count: number;
-    products: Product[];
-  } | null>(null);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState<string | null>(null);
 
   // Check if user is near the bottom of the scroll container
   const isNearBottom = useCallback(() => {
@@ -130,7 +138,7 @@ export default function ChatMessages({
     }, 50); // Small delay to batch rapid updates
 
     return () => clearTimeout(timeoutId);
-  }, [messages, isLoading, productsVisible, scrollToBottom, isNearBottom]);
+  }, [messages, isLoading, productsList, scrollToBottom, isNearBottom]);
 
   // Force scroll on initial load or when loading starts
   useEffect(() => {
@@ -162,48 +170,105 @@ export default function ChatMessages({
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Hide products when messages length changes (new message sent)
-  useEffect(() => {
-    if (showProducts && messages.length > 0) {
-      handleHideProducts();
-    }
-  }, [messages.length]);
+  // Helper function to get products for a specific message
+  const getProductsForMessage = (messageId: string) => {
+    return productsList.find((p) => p.messageId === messageId);
+  };
 
   const handleTypewriterComplete = (messageId: string) => {
     console.log("Typewriter complete for message:", messageId);
   };
 
-  const handleShowProducts = async (messageContent: string) => {
-    setLoadingProducts(true);
-    console.log("Fetching products for message:", messageContent);
+  const handleShowProducts = async (
+    messageContent: string,
+    assistantMessageId: string
+  ) => {
+    if (!conversationId) return;
+
+    setLoadingProducts(assistantMessageId);
+
     try {
       const response = await fetchProducts({ message: messageContent });
       if (isActionError(response)) {
         console.error("Error fetching products:", response);
+        setLoadingProducts(null);
         return;
       }
       if (response && response.products && response.products.length > 0) {
-        setProductsData(response);
-        setShowProducts(true);
-        setTimeout(() => setProductsVisible(true), 100);
+        // Save products to Redux with visible state
+        dispatch(
+          addProducts({
+            conversationId,
+            products: {
+              category: response.category,
+              count: response.count,
+              products: response.products,
+              messageId: assistantMessageId,
+              isVisible: true,
+            },
+          })
+        );
         onProductsVisibilityChange?.(true);
+
+        // Wait for products to render, then scroll smoothly to them
+        setTimeout(() => {
+          const productsElement = productsRefs.current[assistantMessageId];
+          if (productsElement && scrollContainerRef.current) {
+            const container = scrollContainerRef.current;
+            const elementTop = productsElement.offsetTop - container.offsetTop;
+            container.scrollTo({
+              top: elementTop - 20, // 20px offset from top
+              behavior: "smooth",
+            });
+          }
+        }, 100); // Small delay to ensure DOM is updated
       } else {
         console.log("No products found");
       }
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
-      setLoadingProducts(false);
+      setLoadingProducts(null);
     }
   };
 
-  const handleHideProducts = () => {
-    setProductsVisible(false);
+  const handleHideProducts = (messageId: string) => {
+    if (!conversationId) return;
+    // Save visibility state to Redux
+    dispatch(
+      setProductsVisibility({
+        conversationId,
+        messageId,
+        isVisible: false,
+      })
+    );
     onProductsVisibilityChange?.(false);
+  };
+
+  const handleShowProductsFromRedux = (messageId: string) => {
+    if (!conversationId) return;
+    // Save visibility state to Redux
+    dispatch(
+      setProductsVisibility({
+        conversationId,
+        messageId,
+        isVisible: true,
+      })
+    );
+    onProductsVisibilityChange?.(true);
+
+    // Scroll smoothly to products after they're shown
     setTimeout(() => {
-      setShowProducts(false);
-      setProductsData(null);
-    }, 500);
+      const productsElement = productsRefs.current[messageId];
+      if (productsElement && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const elementTop = productsElement.offsetTop - container.offsetTop;
+        container.scrollTo({
+          top: elementTop - 20, // 20px offset from top
+          behavior: "smooth",
+        });
+      }
+    }, 100); // Small delay to ensure DOM is updated
   };
 
   return (
@@ -216,6 +281,21 @@ export default function ChatMessages({
           if (message.senderId === "assistant" && !message.content.trim()) {
             return null;
           }
+
+          const productsForThisMessage = getProductsForMessage(message.id);
+          const isLastMessage = index === messages.length - 1;
+          const isAssistantMessage = message.senderId === "assistant";
+
+          const isMessageComplete = message.content.trim().length > 0;
+          const isNotStreamingThisMessage = animatingMessageId !== message.id;
+
+          const canShowButton =
+            isMessageComplete && (isNotStreamingThisMessage || !isLoading);
+          const shouldShowButton =
+            isLastMessage &&
+            isAssistantMessage &&
+            !productsForThisMessage &&
+            canShowButton;
 
           return (
             <div key={message.id}>
@@ -230,76 +310,100 @@ export default function ChatMessages({
                   />
                 </div>
               </div>
+
+              {/* Show "View Recommended Products" button after assistant messages if products haven't been fetched */}
+              {shouldShowButton && (
+                <div className="flex justify-start mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <button
+                    onClick={() => {
+                      // Find the user message that corresponds to this assistant message
+                      const userMessage = messages
+                        .slice(0, index)
+                        .reverse()
+                        .find((m) => m.senderId === "user");
+
+                      if (userMessage) {
+                        handleShowProducts(userMessage.content, message.id);
+                      }
+                    }}
+                    disabled={loadingProducts === message.id}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:scale-105 w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {loadingProducts === message.id
+                      ? "Loading Products..."
+                      : "View Recommended Products"}
+                  </button>
+                </div>
+              )}
+
+              {/* Render products right after the message that triggered them */}
+              {productsForThisMessage && (
+                <div
+                  ref={(el) => {
+                    productsRefs.current[message.id] = el;
+                  }}
+                  className={`mt-4 transition-all duration-500 ease-in-out transform origin-top ${
+                    productsForThisMessage.isVisible !== false
+                      ? "opacity-100 translate-y-0 scale-y-100"
+                      : "opacity-0 -translate-y-4 scale-y-95"
+                  }`}
+                  style={{
+                    maxHeight:
+                      productsForThisMessage.isVisible !== false
+                        ? "1000px"
+                        : "0px",
+                    overflow:
+                      productsForThisMessage.isVisible !== false
+                        ? "visible"
+                        : "hidden",
+                  }}
+                >
+                  <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-6 border border-primary/20">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-semibold text-primary">
+                          Herbie's Curated Products
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => handleHideProducts(message.id)}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {productsForThisMessage.category} •{" "}
+                      {productsForThisMessage.count} products found
+                    </p>
+                    <ProductsCarousel
+                      products={productsForThisMessage.products}
+                      title=""
+                      subtitle=""
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Show "Show Products" button after the message that triggered products if hidden */}
+              {productsForThisMessage &&
+                productsForThisMessage.isVisible === false &&
+                !isLoading && (
+                  <div className="flex justify-start mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <button
+                      onClick={() => handleShowProductsFromRedux(message.id)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:scale-105 w-fit"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Show Products
+                    </button>
+                  </div>
+                )}
             </div>
           );
         })}
-
-        {messages.length > 0 &&
-          !isLoading &&
-          messages[messages.length - 1].senderId === "assistant" &&
-          !showProducts && (
-            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <button
-                onClick={() => {
-                  // Find the last user message
-                  const lastUserMessage = [...messages]
-                    .reverse()
-                    .find((m) => m.senderId === "user");
-
-                  if (lastUserMessage) {
-                    handleShowProducts(lastUserMessage.content);
-                  }
-                }}
-                disabled={loadingProducts}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:scale-105 w-fit disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="w-4 h-4" />
-                {loadingProducts
-                  ? "Loading Products..."
-                  : "View Recommended Products"}
-              </button>
-            </div>
-          )}
-
-        {/* Products Carousel - appears after all messages */}
-        {showProducts && productsData && (
-          <div
-            className={`transition-all duration-500 ease-in-out transform origin-top ${
-              productsVisible
-                ? "opacity-100 translate-y-0 scale-y-100"
-                : "opacity-0 -translate-y-4 scale-y-95"
-            }`}
-            style={{
-              maxHeight: productsVisible ? "1000px" : "0px",
-              overflow: productsVisible ? "visible" : "hidden",
-            }}
-          >
-            <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-6 border border-primary/20">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-primary">
-                    Herbie's Curated Products
-                  </h3>
-                </div>
-                <button
-                  onClick={handleHideProducts}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Hide
-                </button>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {productsData.category} • {productsData.count} products found
-              </p>
-              <ProductsCarousel
-                products={productsData.products}
-                title=""
-                subtitle=""
-              />
-            </div>
-          </div>
-        )}
 
         {/* Only show loader if there's no streaming message with content yet */}
         {isLoading &&
