@@ -4,16 +4,18 @@ import { persistStore, persistReducer } from "redux-persist";
 import { useSelector, type TypedUseSelectorHook } from "react-redux";
 import conversationsSlice from "./features/conversations-slice";
 import messagesSlice from "./features/messages-slice";
+import productsSlice from "./features/products-slice";
 
 const rootReducer = combineReducers({
   conversations: conversationsSlice,
   messages: messagesSlice,
+  products: productsSlice,
 });
 
 const persistConfig = {
   key: "root",
   storage: localStorage,
-  whitelist: ["conversations", "messages"],
+  whitelist: ["conversations", "messages", "products"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
