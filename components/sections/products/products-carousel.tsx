@@ -165,15 +165,15 @@ export default function ProductsCarousel({
                     {product.on_sale && product.sale_price ? (
                       <div className="flex items-center gap-2">
                         <span className="text-base font-bold text-primary">
-                          ${product.sale_price}
+                          £{product.sale_price}
                         </span>
                         <span className="text-xs text-muted-foreground line-through">
-                          ${product.regular_price}
+                          £{product.regular_price}
                         </span>
                       </div>
                     ) : (
                       <span className="text-base font-bold text-foreground">
-                        ${product.price}
+                        £{product.price}
                       </span>
                     )}
                   </div>
