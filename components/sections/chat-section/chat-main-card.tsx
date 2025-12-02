@@ -31,12 +31,21 @@ export default function ChatMainCard({
         {showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">
-              Hey there, I'm Herbie
+              Hey there, I'm <span className="text-primary">Herbie</span>
             </h2>
-            <p className="max-w-md text-sm leading-relaxed">
+            <p className="max-w-md text-sm leading-relaxed mb-4">
               I'm your AI natural remedy companion. Ask me anything about
               remedies, recommendations, or support.
             </p>
+            <div className="max-w-md mt-6 pt-4 border-t border-border/50">
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Disclaimer
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Herbie is AI-generated and may contain mistakes. This is not
+                professional advice.
+              </p>
+            </div>
           </div>
         ) : (
           <ChatMessages

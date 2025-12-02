@@ -67,8 +67,16 @@ export default function ChatHeader({ onSidebarToggle }: ChatHeaderProps) {
               height={40}
               className="w-10 h-10 object-contain dark:invert"
             />
-            <h1 className="text-lg sm:text-xl font-semibold text-foreground">
-              Herbie
+            <h1 className="text-lg sm:text-xl font-semibold">
+              <span className="text-primary inline-block animate-letter-fade-in">
+                Ask{" "}
+              </span>
+              <span
+                className="text-primary inline-block animate-letter-fade-in"
+                style={{ animationDelay: "0.2s", opacity: 0 }}
+              >
+                Herbie
+              </span>
             </h1>
           </div>
         </div>
