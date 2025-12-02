@@ -14,5 +14,9 @@ export const metadata: Metadata = {
 }
 
 export default function ChatPage() {
-  return <ChatSection />
+  return (
+    <div className="h-full">
+      <ChatSection />
+    </div>
+  );
 }

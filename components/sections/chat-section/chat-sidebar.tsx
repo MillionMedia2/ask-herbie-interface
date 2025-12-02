@@ -11,6 +11,16 @@ import { clearMessages } from "@/redux/features/messages-slice";
 import { clearProducts } from "@/redux/features/products-slice";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ChatSidebarProps {
   onClose?: () => void;
@@ -34,12 +44,23 @@ export default function ChatSidebar({
   );
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const filteredConversations = conversations.filter((conv) =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDeleteConversation = (id: string) => {
+  const handleDeleteClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConversationToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!conversationToDelete) return;
+
+    const id = conversationToDelete;
     dispatch(removeConversation(id));
     dispatch(clearMessages(id));
     dispatch(clearProducts(id));
@@ -54,7 +75,14 @@ export default function ChatSidebar({
       onNewConversation?.();
     }
 
+    setIsDeleteDialogOpen(false);
+    setConversationToDelete(null);
     onClose?.();
+  };
+
+  const handleDeleteCancel = () => {
+    setIsDeleteDialogOpen(false);
+    setConversationToDelete(null);
   };
 
   const handleConversationClick = (id: string) => {
@@ -145,11 +173,9 @@ export default function ChatSidebar({
                     </p>
                   </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteConversation(conv.id);
-                    }}
+                    onClick={(e) => handleDeleteClick(conv.id, e)}
                     className="ml-2 flex-shrink-0 rounded p-1 opacity-0 transition-all hover:bg-destructive/10 group-hover:opacity-100"
+                    aria-label="Delete conversation"
                   >
                     <Trash2 size={14} className="text-destructive" />
                   </button>
@@ -159,6 +185,31 @@ export default function ChatSidebar({
           )}
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={handleDeleteCancel}
+              className="hover:bg-primary hover:text-primary-foreground"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

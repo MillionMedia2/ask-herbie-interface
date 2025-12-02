@@ -1,20 +1,21 @@
-"use client"
+"use client";
 
-import { useTheme } from "next-themes"
-import { Moon, Sun, Menu } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useTheme } from "next-themes";
+import { Moon, Sun, Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 
 interface ChatHeaderProps {
-  onSidebarToggle: () => void
+  onSidebarToggle: () => void;
 }
 
 export default function ChatHeader({ onSidebarToggle }: ChatHeaderProps) {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   if (!mounted) {
     return (
@@ -28,12 +29,23 @@ export default function ChatHeader({ onSidebarToggle }: ChatHeaderProps) {
             >
               <Menu size={20} className="text-foreground" />
             </button>
-            <h1 className="text-lg sm:text-xl font-semibold text-foreground">🌿 Herbie</h1>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/herbi_logo.png"
+                alt="Herbie Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain dark:invert"
+              />
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground">
+                Herbie
+              </h1>
+            </div>
           </div>
           <div className="w-10 h-10" />
         </div>
       </header>
-    )
+    );
   }
 
   return (
@@ -47,7 +59,26 @@ export default function ChatHeader({ onSidebarToggle }: ChatHeaderProps) {
           >
             <Menu size={20} className="text-foreground" />
           </button>
-          <h1 className="text-lg sm:text-xl font-semibold text-foreground">🌿 Herbie</h1>
+          <div className="flex items-center gap-2">
+            <Image
+              src="/herbi_logo.png"
+              alt="Herbie Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain dark:invert"
+            />
+            <h1 className="text-lg sm:text-xl font-semibold">
+              <span className="text-primary inline-block animate-letter-fade-in">
+                Ask{" "}
+              </span>
+              <span
+                className="text-primary inline-block animate-letter-fade-in"
+                style={{ animationDelay: "0.2s", opacity: 0 }}
+              >
+                Herbie
+              </span>
+            </h1>
+          </div>
         </div>
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -62,5 +93,5 @@ export default function ChatHeader({ onSidebarToggle }: ChatHeaderProps) {
         </button>
       </div>
     </header>
-  )
+  );
 }

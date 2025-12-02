@@ -37,7 +37,7 @@ export default function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask me anything (e.g. natural remedies for anxiety)"
           disabled={isLoading}
-          className="flex-1 text-sm sm:text-base border border-[#D0D0D0] dark:border-border "
+          className="flex-1 text-sm sm:text-base border border-primary/30 dark:border-primary/30 focus-visible:border-primary"
         />
         <Button
           type="submit"
