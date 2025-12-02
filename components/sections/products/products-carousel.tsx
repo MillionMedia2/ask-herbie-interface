@@ -67,26 +67,30 @@ export default function ProductsCarousel({
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
+      {(title || subtitle) && (
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            {title && (
+              <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+            )}
+            {subtitle && (
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Carousel Wrapper */}
-      <div className="relative">
+      <div className="relative w-full max-w-full">
         {/* Scroll Left Button */}
         {canScrollLeft && (
           <button
             onClick={() => scroll("left")}
             className={cn(
               "absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm border border-border rounded-full p-2 shadow-md hover:bg-muted transition-all",
-              "hidden sm:flex"
+              "flex"
             )}
             aria-label="Scroll left"
           >
@@ -98,7 +102,7 @@ export default function ProductsCarousel({
         <div
           ref={containerRef}
           data-carousel-container
-          className="flex gap-4 overflow-x-auto scroll-smooth pb-3 snap-x snap-mandatory touch-pan-x"
+          className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-3 snap-x snap-mandatory touch-pan-x w-full "
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
@@ -113,7 +117,7 @@ export default function ProductsCarousel({
           {products.map((product) => (
             <div
               key={product.id}
-              className="flex-shrink-0 snap-start w-[85%] sm:w-72 md:w-64 bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+              className="flex-shrink-0 snap-start w-[75vw] max-w-[280px] sm:w-72 sm:max-w-none md:w-64 bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
               {/* Image */}
               <div className="relative bg-muted aspect-square flex items-center justify-center overflow-hidden">
@@ -214,7 +218,7 @@ export default function ProductsCarousel({
             onClick={() => scroll("right")}
             className={cn(
               "absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm border border-border rounded-full p-2 shadow-md hover:bg-muted transition-all",
-              "hidden sm:flex"
+              "flex"
             )}
             aria-label="Scroll right"
           >

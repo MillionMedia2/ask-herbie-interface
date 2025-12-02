@@ -49,7 +49,7 @@ export default function ChatMessages({
   });
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="w-full max-w-full h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div className="space-y-4 pb-4">
           {messages.map((message, index) => {
@@ -129,7 +129,7 @@ export default function ChatMessages({
                     ref={(el) => {
                       productsRefs.current[message.id] = el;
                     }}
-                    className={`mt-4 transition-all duration-500 ease-in-out transform origin-top ${
+                    className={`mt-4 w-full max-sm:max-w-[calc(100vw-1.6rem)] overflow-hidden transition-all duration-500 ease-in-out transform origin-top ${
                       productsForThisMessage.isVisible !== false
                         ? "opacity-100 translate-y-0 scale-y-100"
                         : "opacity-0 -translate-y-4 scale-y-95"
@@ -145,17 +145,17 @@ export default function ChatMessages({
                           : "hidden",
                     }}
                   >
-                    <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-6 border border-primary/20">
+                    <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-3 sm:p-6 border border-primary/20 w-full max-w-full overflow-hidden">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="w-5 h-5 text-primary" />
-                          <h3 className="text-lg font-semibold text-primary">
+                          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                          <h3 className="text-base sm:text-lg font-semibold text-primary">
                             Herbie's Curated Products
                           </h3>
                         </div>
                         <button
                           onClick={() => handleHideProducts(message.id)}
-                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                         >
                           Hide
                         </button>
@@ -164,11 +164,13 @@ export default function ChatMessages({
                         {productsForThisMessage.category} •{" "}
                         {productsForThisMessage.count} products found
                       </p>
-                      <ProductsCarousel
-                        products={productsForThisMessage.products}
-                        title=""
-                        subtitle=""
-                      />
+                      <div className="w-full overflow-hidden">
+                        <ProductsCarousel
+                          products={productsForThisMessage.products}
+                          title=""
+                          subtitle=""
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

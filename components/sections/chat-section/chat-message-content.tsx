@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface ChatMessageContentProps {
@@ -10,6 +10,14 @@ interface ChatMessageContentProps {
   messageId: string;
   shouldAnimate?: boolean;
   onTypewriterComplete?: (messageId: string) => void;
+}
+
+/**
+ * Removes AI citation markers like 【4:12†source】 from text
+ * This is a synchronous operation with no delay
+ */
+function stripCitations(text: string): string {
+  return text.replace(/【[^】]*†[^】]*】/g, "");
 }
 
 function ChatMessageContent({
@@ -21,18 +29,21 @@ function ChatMessageContent({
 }: ChatMessageContentProps) {
   const isAssistant = senderId === "assistant";
 
-  // Backend is already sending words one by one, so we don't need typewriter effect
-  // Just display the content directly as it streams in
-  const textToShow = content;
+  // Strip citation markers and memoize to avoid recalculating on every render
+  const textToShow = useMemo(() => stripCitations(content), [content]);
 
   return (
     <div
       className={cn(
-        "px-4 py-3 rounded-2xl max-w-[85%] wrap-break-word",
+        "px-2 sm:px-4 py-3 rounded-2xl max-w-[93%] sm:max-w-[85%] wrap-break-word",
         isAssistant
           ? "bg-muted text-foreground"
           : "bg-primary text-primary-foreground ml-auto"
       )}
+      style={{
+        paddingLeft: "1rem",
+        paddingRight: "1rem",
+      }}
     >
       {isAssistant ? (
         <div className="markdown-content">
