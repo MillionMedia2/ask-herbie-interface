@@ -263,6 +263,7 @@ export default function ChatSection() {
           onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           streamingMessageId={streamingMessageId}
+          onQuestionClick={handleQuestionClick}
         />
       </div>
 
