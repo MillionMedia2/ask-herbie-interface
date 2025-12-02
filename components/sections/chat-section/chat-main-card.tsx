@@ -27,10 +27,7 @@ export default function ChatMainCard({
     <div className="flex flex-col h-full bg-card border border-[#D0D0D0] dark:border-border rounded-[14px] shadow-[0_4px_14px_rgba(0,0,0,0.08)] overflow-hidden">
       <ChatHeader onSidebarToggle={onToggleSidebar} />
 
-      <div
-        className="flex-1 overflow-y-auto p-4"
-        style={{ height: "calc(100vh - 64px)" }}
-      >
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">

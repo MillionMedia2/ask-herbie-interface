@@ -14,5 +14,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <HomePage />;
+  return (
+    <div className="h-full">
+      <HomePage />
+    </div>
+  );
 }

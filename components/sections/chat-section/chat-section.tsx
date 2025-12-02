@@ -224,9 +224,9 @@ export default function ChatSection() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden p-[5px]">
+    <div className="flex h-full w-full bg-background overflow-hidden p-[5px]">
       <div
-        className={`fixed inset-y-0 left-0 bg-background md:bg-transparent z-40 w-[80%] md:relative md:z-auto md:w-[24%] xl:w-[20%] transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 bg-background md:bg-transparent z-40 w-[80%] md:relative md:z-auto md:w-[24%] xl:w-[20%] md:h-full transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
