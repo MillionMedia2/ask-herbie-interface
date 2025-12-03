@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useDispatch } from "react-redux";
+import { useSearchParams } from "next/navigation";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
 import ChatSidebar from "./chat-sidebar";
@@ -16,6 +17,9 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
+  const searchParams = useSearchParams();
+  const hasProcessedBtnParam = useRef(false);
+  
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
   );
@@ -43,7 +47,7 @@ export default function ChatSection() {
     return words.length > 50 ? words.substring(0, 50) + "..." : words;
   };
 
-  const handleQuestionClick = async (question: string) => {
+  const handleQuestionClick = useCallback(async (question: string) => {
     setShowSuggestions(false);
     const conversationId = Date.now().toString();
     const conversationTitle = getConversationTitle(question);
@@ -123,7 +127,27 @@ export default function ChatSection() {
         setStreamingMessageId(null);
       },
     });
-  };
+  }, [dispatch]);
+
+  // Handle btn parameter from URL (WordPress iframe integration)
+  useEffect(() => {
+    const btnText = searchParams.get("btn");
+    
+    // Only process if btn param exists and hasn't been processed yet
+    if (btnText && !hasProcessedBtnParam.current) {
+      hasProcessedBtnParam.current = true;
+      
+      // Start a new conversation with the button text
+      handleQuestionClick(btnText);
+      
+      // Clean up the URL by removing the btn parameter (optional, for cleaner UX)
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("btn");
+        window.history.replaceState({}, "", url.pathname);
+      }
+    }
+  }, [searchParams, handleQuestionClick]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
