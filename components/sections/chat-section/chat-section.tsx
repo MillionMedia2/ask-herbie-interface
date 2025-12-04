@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
@@ -16,6 +16,7 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
+  const lastProcessedBtnRef = useRef<string | null>(null);
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
@@ -129,9 +130,8 @@ export default function ChatSection() {
     [dispatch]
   );
 
-  // Handle btn parameter from URL on mount (WordPress iframe integration)
-  // Each iframe.src change triggers a full page reload, so we only need to check on mount
-  useEffect(() => {
+  // Function to check and process btn parameter from URL
+  const checkAndProcessBtnParam = useCallback(() => {
     if (typeof window === "undefined") return;
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -140,8 +140,15 @@ export default function ChatSection() {
     // Only process if btn param exists in URL
     if (!btnText) return;
 
-    // IMMEDIATELY clean the URL to prevent any double-processing
-    // This must happen FIRST, before any async operations
+    // Skip if we already processed this exact btn value (prevents double-processing)
+    if (btnText === lastProcessedBtnRef.current) return;
+
+    console.log("[Herbie] Processing btn param:", btnText);
+
+    // Mark as processed BEFORE any async operations
+    lastProcessedBtnRef.current = btnText;
+
+    // IMMEDIATELY clean the URL to prevent any re-processing
     const url = new URL(window.location.href);
     url.searchParams.delete("btn");
     window.history.replaceState({}, "", url.pathname);
@@ -150,13 +157,55 @@ export default function ChatSection() {
     dispatch(setActiveConversation(null));
 
     // Start a new conversation with the button text
-    // Use setTimeout to ensure state is cleared before starting new conversation
     setTimeout(() => {
       handleQuestionClick(btnText);
     }, 0);
+  }, [dispatch, handleQuestionClick]);
 
+  // Clear any selected conversation on mount - always start fresh
+  useEffect(() => {
+    dispatch(setActiveConversation(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Intentionally empty - only run once on mount
+  }, []); // Only on mount
+
+  // Handle btn parameter from URL (WordPress iframe integration)
+  useEffect(() => {
+    // Check on initial mount
+    checkAndProcessBtnParam();
+
+    // Also handle bfcache restoration (when browser restores page from cache)
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        // Page was restored from bfcache - reset and recheck
+        console.log("[Herbie] Page restored from bfcache, rechecking URL");
+        dispatch(setActiveConversation(null)); // Clear any selected chat
+        lastProcessedBtnRef.current = null;
+        checkAndProcessBtnParam();
+      }
+    };
+
+    // Handle iframe focus (fallback for some edge cases)
+    const handleFocus = () => {
+      // Small delay to ensure URL is updated
+      setTimeout(() => {
+        // Reset ref to allow reprocessing even for same question
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("btn")) {
+          dispatch(setActiveConversation(null)); // Clear any selected chat
+          lastProcessedBtnRef.current = null;
+        }
+        checkAndProcessBtnParam();
+      }, 50);
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [checkAndProcessBtnParam, dispatch]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
