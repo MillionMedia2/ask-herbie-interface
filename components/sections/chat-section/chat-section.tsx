@@ -193,21 +193,71 @@ export default function ChatSection() {
     // Check on mount
     checkAndProcessBtnParam();
 
-    // Set up interval to check for URL changes (for iframe navigation)
-    const intervalId = setInterval(() => {
-      const currentUrl = window.location.href;
-      if (currentUrl !== lastUrlRef.current && currentUrl.includes("btn=")) {
-        console.log("[Herbie] URL changed via iframe navigation");
-        isProcessingRef.current = false; // Reset to allow processing
-        checkAndProcessBtnParam();
+    // Listen for custom event from parent window (WordPress)
+    const handleParentMessage = (event: MessageEvent) => {
+      console.log("[Herbie] Received message from parent:", event.data);
+
+      // Security: Only accept messages from your WordPress domain
+      // Uncomment and update with your actual domain
+      // if (event.origin !== "https://plantz.io") return;
+
+      if (event.data?.type === "HERBIE_NEW_QUESTION") {
+        console.log("[Herbie] New question from parent");
+        isProcessingRef.current = false;
+        lastUrlRef.current = "";
+
+        // Small delay to ensure URL is updated
+        setTimeout(() => {
+          checkAndProcessBtnParam();
+        }, 100);
       }
-    }, 500);
+    };
+
+    // Handle Navigation API (modern way, better than popstate)
+    let navigationListener: (() => void) | null = null;
+
+    if (typeof window !== "undefined" && "navigation" in window) {
+      // @ts-ignore - Navigation API is new and may not be in types yet
+      navigationListener = window.navigation.addEventListener(
+        "navigate",
+        (event: any) => {
+          console.log("[Herbie] Navigation API - navigate event");
+          const url = new URL(event.destination.url);
+          if (url.searchParams.has("btn")) {
+            isProcessingRef.current = false;
+            setTimeout(() => checkAndProcessBtnParam(), 50);
+          }
+        }
+      );
+    }
+
+    // Fallback: Monitor URL changes using MutationObserver on history
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    const historyChangeHandler = () => {
+      console.log("[Herbie] History changed");
+      if (window.location.href.includes("btn=")) {
+        isProcessingRef.current = false;
+        setTimeout(() => checkAndProcessBtnParam(), 50);
+      }
+    };
+
+    window.history.pushState = function (...args) {
+      originalPushState.apply(window.history, args);
+      historyChangeHandler();
+    };
+
+    window.history.replaceState = function (...args) {
+      originalReplaceState.apply(window.history, args);
+      historyChangeHandler();
+    };
 
     // Handle popstate (back/forward navigation)
     const handlePopState = () => {
       console.log("[Herbie] popstate event");
       isProcessingRef.current = false;
-      checkAndProcessBtnParam();
+      setTimeout(() => checkAndProcessBtnParam(), 50);
     };
 
     // Handle bfcache restoration
@@ -221,22 +271,34 @@ export default function ChatSection() {
       }
     };
 
-    // Handle hash changes (sometimes used in iframe navigation)
+    // Handle hash changes
     const handleHashChange = () => {
       console.log("[Herbie] hashchange event");
-      isProcessingRef.current = false;
-      checkAndProcessBtnParam();
+      if (window.location.href.includes("btn=")) {
+        isProcessingRef.current = false;
+        setTimeout(() => checkAndProcessBtnParam(), 50);
+      }
     };
 
+    window.addEventListener("message", handleParentMessage);
     window.addEventListener("popstate", handlePopState);
     window.addEventListener("pageshow", handlePageShow);
     window.addEventListener("hashchange", handleHashChange);
 
     return () => {
-      clearInterval(intervalId);
+      // Restore original history methods
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+
+      window.removeEventListener("message", handleParentMessage);
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("hashchange", handleHashChange);
+
+      if (navigationListener) {
+        // @ts-ignore
+        window.navigation.removeEventListener("navigate", navigationListener);
+      }
     };
   }, [checkAndProcessBtnParam, dispatch]);
 
