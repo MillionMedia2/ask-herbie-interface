@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { Suspense } from "react"
 import ChatSection from "@/components/sections/chat-section/chat-section"
 
 export const metadata: Metadata = {
@@ -17,9 +16,7 @@ export const metadata: Metadata = {
 export default function ChatPage() {
   return (
     <div className="h-full">
-      <Suspense fallback={<div className="h-full flex items-center justify-center">Loading...</div>}>
-        <ChatSection />
-      </Suspense>
+      <ChatSection />
     </div>
   );
 }

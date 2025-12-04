@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDispatch } from "react-redux";
-import { useSearchParams } from "next/navigation";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
 import ChatSidebar from "./chat-sidebar";
@@ -17,8 +16,6 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
-  const searchParams = useSearchParams();
-  const processedSearchParamsRef = useRef<URLSearchParams | null>(null);
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
@@ -132,30 +129,34 @@ export default function ChatSection() {
     [dispatch]
   );
 
-  // Handle btn parameter from URL (WordPress iframe integration)
+  // Handle btn parameter from URL on mount (WordPress iframe integration)
+  // Each iframe.src change triggers a full page reload, so we only need to check on mount
   useEffect(() => {
-    // Skip if we've already processed this exact searchParams instance
-    if (searchParams === processedSearchParamsRef.current) {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
-    const btnText = searchParams.get("btn");
+    const urlParams = new URLSearchParams(window.location.search);
+    const btnText = urlParams.get("btn");
 
-    if (btnText) {
-      // Mark this searchParams as processed to prevent duplicate calls in same cycle
-      processedSearchParamsRef.current = searchParams;
+    // Only process if btn param exists in URL
+    if (!btnText) return;
 
-      // Start a new conversation with the button text
+    // IMMEDIATELY clean the URL to prevent any double-processing
+    // This must happen FIRST, before any async operations
+    const url = new URL(window.location.href);
+    url.searchParams.delete("btn");
+    window.history.replaceState({}, "", url.pathname);
+
+    // Clear any previously selected conversation to ensure fresh start
+    dispatch(setActiveConversation(null));
+
+    // Start a new conversation with the button text
+    // Use setTimeout to ensure state is cleared before starting new conversation
+    setTimeout(() => {
       handleQuestionClick(btnText);
+    }, 0);
 
-      // Clean up the URL by removing the btn parameter
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("btn");
-        window.history.replaceState({}, "", url.pathname);
-      }
-    }
-  }, [searchParams, handleQuestionClick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty - only run once on mount
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
