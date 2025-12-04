@@ -17,6 +17,7 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
   const lastProcessedBtnRef = useRef<string | null>(null);
+  const isProcessingRef = useRef(false);
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
@@ -72,7 +73,6 @@ export default function ChatSection() {
       dispatch(addMessage(userMessage));
       setIsLoading(true);
 
-      // Create AI message placeholder
       const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
         id: aiMessageId,
@@ -84,14 +84,12 @@ export default function ChatSection() {
       dispatch(addMessage(aiMessage));
       setStreamingMessageId(aiMessageId);
 
-      // Stream the response - accumulate chunks since backend sends incremental chunks
       let accumulatedContent = "";
       let hasReceivedFirstChunk = false;
       await askAIStream({
         question,
         onChunk: (chunk: string) => {
           accumulatedContent += chunk;
-          // Hide loader as soon as first chunk arrives
           if (!hasReceivedFirstChunk) {
             hasReceivedFirstChunk = true;
             setIsLoading(false);
@@ -134,19 +132,30 @@ export default function ChatSection() {
   const checkAndProcessBtnParam = useCallback(() => {
     if (typeof window === "undefined") return;
 
+    // Prevent concurrent processing
+    if (isProcessingRef.current) {
+      console.log("[Herbie] Already processing, skipping");
+      return;
+    }
+
+    console.log("[Herbie] Checking URL:", window.location.href);
+    console.log("[Herbie] Search params:", window.location.search);
+
     const urlParams = new URLSearchParams(window.location.search);
     const btnText = urlParams.get("btn");
 
-    // Only process if btn param exists in URL
-    if (!btnText) return;
+    console.log("[Herbie] btnText found:", btnText);
 
-    // Skip if we already processed this exact btn value (prevents double-processing)
-    if (btnText === lastProcessedBtnRef.current) return;
+    // Only process if btn param exists in URL
+    if (!btnText) {
+      console.log("[Herbie] No btn param, skipping");
+      return;
+    }
 
     console.log("[Herbie] Processing btn param:", btnText);
 
-    // Mark as processed BEFORE any async operations
-    lastProcessedBtnRef.current = btnText;
+    // Mark as processing
+    isProcessingRef.current = true;
 
     // IMMEDIATELY clean the URL to prevent any re-processing
     const url = new URL(window.location.href);
@@ -158,52 +167,57 @@ export default function ChatSection() {
 
     // Start a new conversation with the button text
     setTimeout(() => {
-      handleQuestionClick(btnText);
-    }, 0);
+      console.log("[Herbie] Calling handleQuestionClick with:", btnText);
+      handleQuestionClick(btnText).finally(() => {
+        // Reset processing flag after completion
+        isProcessingRef.current = false;
+        lastProcessedBtnRef.current = btnText;
+      });
+    }, 100);
   }, [dispatch, handleQuestionClick]);
 
   // Clear any selected conversation on mount - always start fresh
   useEffect(() => {
     dispatch(setActiveConversation(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount
+  }, []);
 
   // Handle btn parameter from URL (WordPress iframe integration)
   useEffect(() => {
-    // Check on initial mount
+    console.log("[Herbie] useEffect running - checking btn param");
+
+    // Reset refs on mount to allow fresh processing
+    lastProcessedBtnRef.current = null;
+    isProcessingRef.current = false;
+
     checkAndProcessBtnParam();
 
-    // Also handle bfcache restoration (when browser restores page from cache)
+    // Handle URL changes via popstate
+    const handlePopState = () => {
+      console.log("[Herbie] popstate event - rechecking URL");
+      isProcessingRef.current = false;
+      lastProcessedBtnRef.current = null;
+      dispatch(setActiveConversation(null));
+      checkAndProcessBtnParam();
+    };
+
+    // Handle bfcache restoration
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        // Page was restored from bfcache - reset and recheck
         console.log("[Herbie] Page restored from bfcache, rechecking URL");
-        dispatch(setActiveConversation(null)); // Clear any selected chat
+        isProcessingRef.current = false;
         lastProcessedBtnRef.current = null;
+        dispatch(setActiveConversation(null));
         checkAndProcessBtnParam();
       }
     };
 
-    // Handle iframe focus (fallback for some edge cases)
-    const handleFocus = () => {
-      // Small delay to ensure URL is updated
-      setTimeout(() => {
-        // Reset ref to allow reprocessing even for same question
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get("btn")) {
-          dispatch(setActiveConversation(null)); // Clear any selected chat
-          lastProcessedBtnRef.current = null;
-        }
-        checkAndProcessBtnParam();
-      }, 50);
-    };
-
+    window.addEventListener("popstate", handlePopState);
     window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("focus", handleFocus);
 
     return () => {
+      window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [checkAndProcessBtnParam, dispatch]);
 
@@ -237,7 +251,6 @@ export default function ChatSection() {
     };
     dispatch(addMessage(userMessage));
 
-    // Create AI message placeholder
     const aiMessageId = (Date.now() + 1).toString();
     const aiMessage = {
       id: aiMessageId,
@@ -249,14 +262,12 @@ export default function ChatSection() {
     dispatch(addMessage(aiMessage));
     setStreamingMessageId(aiMessageId);
 
-    // Stream the response - accumulate chunks since backend sends incremental chunks
     let accumulatedContent = "";
     let hasReceivedFirstChunk = false;
     await askAIStream({
       question: content,
       onChunk: (chunk: string) => {
         accumulatedContent += chunk;
-        // Hide loader as soon as first chunk arrives
         if (!hasReceivedFirstChunk) {
           hasReceivedFirstChunk = true;
           setIsLoading(false);
