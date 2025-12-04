@@ -18,8 +18,8 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
   const searchParams = useSearchParams();
-  const hasProcessedBtnParam = useRef(false);
-  
+  const processedSearchParamsRef = useRef<URLSearchParams | null>(null);
+
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
   );
@@ -47,100 +47,108 @@ export default function ChatSection() {
     return words.length > 50 ? words.substring(0, 50) + "..." : words;
   };
 
-  const handleQuestionClick = useCallback(async (question: string) => {
-    setShowSuggestions(false);
-    const conversationId = Date.now().toString();
-    const conversationTitle = getConversationTitle(question);
+  const handleQuestionClick = useCallback(
+    async (question: string) => {
+      setShowSuggestions(false);
+      const conversationId = Date.now().toString();
+      const conversationTitle = getConversationTitle(question);
 
-    dispatch(
-      addConversation({
-        id: conversationId,
-        title: conversationTitle,
-        participants: ["user", "assistant"],
-        updatedAt: new Date().toISOString(),
-      })
-    );
-    dispatch(setActiveConversation(conversationId));
-    setSidebarOpen(false);
+      dispatch(
+        addConversation({
+          id: conversationId,
+          title: conversationTitle,
+          participants: ["user", "assistant"],
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      dispatch(setActiveConversation(conversationId));
+      setSidebarOpen(false);
 
-    const userMessage = {
-      id: Date.now().toString(),
-      conversationId,
-      senderId: "user",
-      content: question,
-      createdAt: new Date().toISOString(),
-    };
-    dispatch(addMessage(userMessage));
-    setIsLoading(true);
+      const userMessage = {
+        id: Date.now().toString(),
+        conversationId,
+        senderId: "user",
+        content: question,
+        createdAt: new Date().toISOString(),
+      };
+      dispatch(addMessage(userMessage));
+      setIsLoading(true);
 
-    // Create AI message placeholder
-    const aiMessageId = (Date.now() + 1).toString();
-    const aiMessage = {
-      id: aiMessageId,
-      conversationId,
-      senderId: "assistant",
-      content: "",
-      createdAt: new Date().toISOString(),
-    };
-    dispatch(addMessage(aiMessage));
-    setStreamingMessageId(aiMessageId);
+      // Create AI message placeholder
+      const aiMessageId = (Date.now() + 1).toString();
+      const aiMessage = {
+        id: aiMessageId,
+        conversationId,
+        senderId: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+      };
+      dispatch(addMessage(aiMessage));
+      setStreamingMessageId(aiMessageId);
 
-    // Stream the response - accumulate chunks since backend sends incremental chunks
-    let accumulatedContent = "";
-    let hasReceivedFirstChunk = false;
-    await askAIStream({
-      question,
-      onChunk: (chunk: string) => {
-        accumulatedContent += chunk;
-        // Hide loader as soon as first chunk arrives
-        if (!hasReceivedFirstChunk) {
-          hasReceivedFirstChunk = true;
+      // Stream the response - accumulate chunks since backend sends incremental chunks
+      let accumulatedContent = "";
+      let hasReceivedFirstChunk = false;
+      await askAIStream({
+        question,
+        onChunk: (chunk: string) => {
+          accumulatedContent += chunk;
+          // Hide loader as soon as first chunk arrives
+          if (!hasReceivedFirstChunk) {
+            hasReceivedFirstChunk = true;
+            setIsLoading(false);
+          }
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId,
+              updates: {
+                content: accumulatedContent,
+              },
+            })
+          );
+        },
+        onComplete: () => {
           setIsLoading(false);
-        }
-        dispatch(
-          updateMessage({
-            id: aiMessageId,
-            conversationId,
-            updates: {
-              content: accumulatedContent,
-            },
-          })
-        );
-      },
-      onComplete: () => {
-        setIsLoading(false);
-        setStreamingMessageId(null);
-      },
-      onError: (error: Error) => {
-        console.error("Streaming error:", error);
-        dispatch(
-          updateMessage({
-            id: aiMessageId,
-            conversationId,
-            updates: {
-              content:
-                "Something went wrong while fetching the response. Please try again.",
-            },
-          })
-        );
-        setIsLoading(false);
-        setStreamingMessageId(null);
-      },
-    });
-  }, [dispatch]);
+          setStreamingMessageId(null);
+        },
+        onError: (error: Error) => {
+          console.error("Streaming error:", error);
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId,
+              updates: {
+                content:
+                  "Something went wrong while fetching the response. Please try again.",
+              },
+            })
+          );
+          setIsLoading(false);
+          setStreamingMessageId(null);
+        },
+      });
+    },
+    [dispatch]
+  );
 
   // Handle btn parameter from URL (WordPress iframe integration)
   useEffect(() => {
+    // Skip if we've already processed this exact searchParams instance
+    if (searchParams === processedSearchParamsRef.current) {
+      return;
+    }
+
     const btnText = searchParams.get("btn");
-    
-    // Only process if btn param exists and hasn't been processed yet
-    if (btnText && !hasProcessedBtnParam.current) {
-      hasProcessedBtnParam.current = true;
-      
+
+    if (btnText) {
+      // Mark this searchParams as processed to prevent duplicate calls in same cycle
+      processedSearchParamsRef.current = searchParams;
+
       // Start a new conversation with the button text
       handleQuestionClick(btnText);
-      
-      // Clean up the URL by removing the btn parameter (optional, for cleaner UX)
+
+      // Clean up the URL by removing the btn parameter
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
         url.searchParams.delete("btn");
