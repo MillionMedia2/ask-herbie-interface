@@ -17,7 +17,7 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
   const isProcessingRef = useRef(false);
-  const lastUrlRef = useRef<string>("");
+  const hasCheckedInitialUrlRef = useRef(false);
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
@@ -48,6 +48,17 @@ export default function ChatSection() {
 
   const handleQuestionClick = useCallback(
     async (question: string) => {
+      if (!question) return;
+
+      // Prevent concurrent calls (but allow if called from processBtnParam which already set this)
+      if (isProcessingRef.current) {
+        console.log("[Herbie] Already processing, skipping duplicate call");
+        return;
+      }
+
+      isProcessingRef.current = true;
+      console.log("[Herbie] handleQuestionClick called with:", question);
+
       setShowSuggestions(false);
       const conversationId = Date.now().toString();
       const conversationTitle = getConversationTitle(question);
@@ -86,221 +97,172 @@ export default function ChatSection() {
 
       let accumulatedContent = "";
       let hasReceivedFirstChunk = false;
-      await askAIStream({
-        question,
-        onChunk: (chunk: string) => {
-          accumulatedContent += chunk;
-          if (!hasReceivedFirstChunk) {
-            hasReceivedFirstChunk = true;
+
+      try {
+        await askAIStream({
+          question,
+          onChunk: (chunk: string) => {
+            accumulatedContent += chunk;
+            if (!hasReceivedFirstChunk) {
+              hasReceivedFirstChunk = true;
+              setIsLoading(false);
+            }
+            dispatch(
+              updateMessage({
+                id: aiMessageId,
+                conversationId,
+                updates: {
+                  content: accumulatedContent,
+                },
+              })
+            );
+          },
+          onComplete: () => {
+            console.log("[Herbie] Stream complete");
             setIsLoading(false);
-          }
-          dispatch(
-            updateMessage({
-              id: aiMessageId,
-              conversationId,
-              updates: {
-                content: accumulatedContent,
-              },
-            })
-          );
-        },
-        onComplete: () => {
-          setIsLoading(false);
-          setStreamingMessageId(null);
-        },
-        onError: (error: Error) => {
-          console.error("Streaming error:", error);
-          dispatch(
-            updateMessage({
-              id: aiMessageId,
-              conversationId,
-              updates: {
-                content:
-                  "Something went wrong while fetching the response. Please try again.",
-              },
-            })
-          );
-          setIsLoading(false);
-          setStreamingMessageId(null);
-        },
-      });
+            setStreamingMessageId(null);
+            isProcessingRef.current = false;
+          },
+          onError: (error: Error) => {
+            console.error("Streaming error:", error);
+            dispatch(
+              updateMessage({
+                id: aiMessageId,
+                conversationId,
+                updates: {
+                  content:
+                    "Something went wrong while fetching the response. Please try again.",
+                },
+              })
+            );
+            setIsLoading(false);
+            setStreamingMessageId(null);
+            isProcessingRef.current = false;
+          },
+        });
+      } catch (error) {
+        console.error("[Herbie] Error in handleQuestionClick:", error);
+        setIsLoading(false);
+        setStreamingMessageId(null);
+        isProcessingRef.current = false;
+      }
     },
     [dispatch]
   );
 
-  // Function to check and process btn parameter from URL
-  const checkAndProcessBtnParam = useCallback(() => {
-    if (typeof window === "undefined") return;
+  // Function to process btn parameter from URL
+  const processBtnParam = useCallback(
+    (btnText: string) => {
+      if (!btnText) {
+        console.log("[Herbie] Skipping - no text");
+        return;
+      }
 
-    const currentUrl = window.location.href;
+      console.log("[Herbie] Processing btn param:", btnText);
 
-    console.log("[Herbie] Checking URL:", currentUrl);
-    console.log("[Herbie] Last URL:", lastUrlRef.current);
+      // Clear any previously selected conversation
+      dispatch(setActiveConversation(null));
 
-    // Prevent concurrent processing
-    if (isProcessingRef.current) {
-      console.log("[Herbie] Already processing, skipping");
-      return;
-    }
+      // Start the conversation (handleQuestionClick manages isProcessingRef)
+      handleQuestionClick(btnText);
+    },
+    [dispatch, handleQuestionClick]
+  );
+
+  // Check URL on mount - this runs BEFORE any URL cleanup
+  useEffect(() => {
+    if (hasCheckedInitialUrlRef.current) return;
+
+    console.log("[Herbie] Initial mount - checking URL");
+    hasCheckedInitialUrlRef.current = true;
 
     const urlParams = new URLSearchParams(window.location.search);
     const btnText = urlParams.get("btn");
 
-    console.log("[Herbie] btnText found:", btnText);
+    console.log("[Herbie] Initial URL check - btnText:", btnText);
 
-    // Only process if btn param exists
-    if (!btnText) {
-      console.log("[Herbie] No btn param, skipping");
-      return;
+    if (btnText) {
+      // Process the button text
+      processBtnParam(btnText);
+
+      // Clean URL after processing
+      setTimeout(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("btn");
+        window.history.replaceState({}, "", url.pathname);
+        console.log("[Herbie] URL cleaned");
+      }, 500);
     }
+  }, [processBtnParam]);
 
-    // Check if this is a new URL (different from last processed)
-    if (currentUrl === lastUrlRef.current) {
-      console.log("[Herbie] Same URL as last processed, skipping");
-      return;
-    }
-
-    console.log("[Herbie] Processing btn param:", btnText);
-
-    // Mark as processing and store current URL
-    isProcessingRef.current = true;
-    lastUrlRef.current = currentUrl;
-
-    // Clear any previously selected conversation to ensure fresh start
-    dispatch(setActiveConversation(null));
-
-    // Clean the URL after a short delay
-    setTimeout(() => {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("btn");
-      window.history.replaceState({}, "", url.pathname);
-    }, 100);
-
-    // Start a new conversation with the button text
-    setTimeout(() => {
-      console.log("[Herbie] Calling handleQuestionClick with:", btnText);
-      handleQuestionClick(btnText).finally(() => {
-        // Reset processing flag after completion
-        isProcessingRef.current = false;
-      });
-    }, 150);
-  }, [dispatch, handleQuestionClick]);
-
-  // Handle btn parameter from URL - runs on mount and when dependencies change
+  // Listen for messages from parent WordPress page
   useEffect(() => {
-    console.log("[Herbie] Main useEffect running");
-
-    // Check on mount
-    checkAndProcessBtnParam();
-
-    // Listen for custom event from parent window (WordPress)
     const handleParentMessage = (event: MessageEvent) => {
-      console.log("[Herbie] Received message from parent:", event.data);
+      console.log("[Herbie] Received message:", event.data);
 
-      // Security: Only accept messages from your WordPress domain
-      // Uncomment and update with your actual domain
+      // Optional: Add origin check for security
       // if (event.origin !== "https://plantz.io") return;
 
-      if (event.data?.type === "HERBIE_NEW_QUESTION") {
-        console.log("[Herbie] New question from parent");
-        isProcessingRef.current = false;
-        lastUrlRef.current = "";
+      if (event.data?.type === "HERBIE_NEW_QUESTION" && event.data?.question) {
+        console.log("[Herbie] New question from parent:", event.data.question);
 
-        // Small delay to ensure URL is updated
+        // Reset state for new question
+        hasCheckedInitialUrlRef.current = false;
+        isProcessingRef.current = false;
+        dispatch(setActiveConversation(null));
+
+        // Process the question
         setTimeout(() => {
-          checkAndProcessBtnParam();
+          processBtnParam(event.data.question);
         }, 100);
       }
     };
 
-    // Handle Navigation API (modern way, better than popstate)
-    let navigationListener: (() => void) | null = null;
+    window.addEventListener("message", handleParentMessage);
 
-    if (typeof window !== "undefined" && "navigation" in window) {
-      // @ts-ignore - Navigation API is new and may not be in types yet
-      navigationListener = window.navigation.addEventListener(
-        "navigate",
-        (event: any) => {
-          console.log("[Herbie] Navigation API - navigate event");
-          const url = new URL(event.destination.url);
-          if (url.searchParams.has("btn")) {
-            isProcessingRef.current = false;
-            setTimeout(() => checkAndProcessBtnParam(), 50);
-          }
-        }
-      );
-    }
-
-    // Fallback: Monitor URL changes using MutationObserver on history
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-
-    const historyChangeHandler = () => {
-      console.log("[Herbie] History changed");
-      if (window.location.href.includes("btn=")) {
-        isProcessingRef.current = false;
-        setTimeout(() => checkAndProcessBtnParam(), 50);
-      }
+    return () => {
+      window.removeEventListener("message", handleParentMessage);
     };
+  }, [processBtnParam, dispatch]);
 
-    window.history.pushState = function (...args) {
-      originalPushState.apply(window.history, args);
-      historyChangeHandler();
-    };
-
-    window.history.replaceState = function (...args) {
-      originalReplaceState.apply(window.history, args);
-      historyChangeHandler();
-    };
-
-    // Handle popstate (back/forward navigation)
+  // Handle back/forward navigation
+  useEffect(() => {
     const handlePopState = () => {
       console.log("[Herbie] popstate event");
-      isProcessingRef.current = false;
-      setTimeout(() => checkAndProcessBtnParam(), 50);
+      const urlParams = new URLSearchParams(window.location.search);
+      const btnText = urlParams.get("btn");
+
+      if (btnText) {
+        hasCheckedInitialUrlRef.current = false;
+        isProcessingRef.current = false;
+        processBtnParam(btnText);
+      }
     };
 
     // Handle bfcache restoration
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
         console.log("[Herbie] Page restored from bfcache");
+        hasCheckedInitialUrlRef.current = false;
         isProcessingRef.current = false;
-        lastUrlRef.current = "";
         dispatch(setActiveConversation(null));
-        checkAndProcessBtnParam();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const btnText = urlParams.get("btn");
+        if (btnText) {
+          processBtnParam(btnText);
+        }
       }
     };
 
-    // Handle hash changes
-    const handleHashChange = () => {
-      console.log("[Herbie] hashchange event");
-      if (window.location.href.includes("btn=")) {
-        isProcessingRef.current = false;
-        setTimeout(() => checkAndProcessBtnParam(), 50);
-      }
-    };
-
-    window.addEventListener("message", handleParentMessage);
     window.addEventListener("popstate", handlePopState);
     window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("hashchange", handleHashChange);
 
     return () => {
-      // Restore original history methods
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-
-      window.removeEventListener("message", handleParentMessage);
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("hashchange", handleHashChange);
-
-      if (navigationListener) {
-        // @ts-ignore
-        window.navigation.removeEventListener("navigate", navigationListener);
-      }
     };
-  }, [checkAndProcessBtnParam, dispatch]);
+  }, [processBtnParam, dispatch]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -390,6 +352,7 @@ export default function ChatSection() {
     setShowSuggestions(true);
     setSidebarOpen(false);
     setStreamingMessageId(null);
+    isProcessingRef.current = false;
   };
 
   const handleConversationClick = () => {
