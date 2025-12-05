@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
@@ -34,29 +34,73 @@ export default function ChatSection() {
   );
   // Track the initial btn param to process
   const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
+  // Ref to track if we've already processed the btn param in this render cycle
+  const processingRef = useRef(false);
 
-  // Read btn param from URL on mount - BEFORE anything else
+  // Read btn param from URL on mount - using ref to handle Strict Mode
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Prevent double-processing in React Strict Mode
+    if (processingRef.current) {
+      console.log("[Herbie] Already processing, skipping...");
+      return;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const btnText = urlParams.get("btn");
+    const timestamp = urlParams.get("_t"); // Get the timestamp from WordPress
 
     console.log("[Herbie] Mount - URL:", window.location.href);
     console.log("[Herbie] Mount - btn param:", btnText);
+    console.log("[Herbie] Mount - timestamp:", timestamp);
 
     if (btnText) {
-      // Store the btn param to process
-      setInitialBtnParam(btnText);
+      // Create a unique key for this specific request
+      const requestKey = `herbie_processed_${btnText}_${timestamp || "no-ts"}`;
 
-      // Clean URL immediately
-      const url = new URL(window.location.href);
-      url.searchParams.delete("btn");
-      window.history.replaceState({}, "", url.pathname);
+      // Check if we've already processed this exact request
+      const alreadyProcessed = sessionStorage.getItem(requestKey);
+
+      if (!alreadyProcessed) {
+        console.log("[Herbie] New request, processing...");
+        processingRef.current = true;
+
+        // Mark this request as processed
+        sessionStorage.setItem(requestKey, "true");
+
+        // Clear old processed keys (keep only last 10)
+        const keys = Object.keys(sessionStorage).filter((k) =>
+          k.startsWith("herbie_processed_")
+        );
+        if (keys.length > 10) {
+          keys
+            .slice(0, keys.length - 10)
+            .forEach((k) => sessionStorage.removeItem(k));
+        }
+
+        // Store the btn param to process
+        setInitialBtnParam(btnText);
+
+        // Clean URL immediately
+        const url = new URL(window.location.href);
+        url.searchParams.delete("btn");
+        url.searchParams.delete("_t");
+        window.history.replaceState({}, "", url.pathname);
+
+        // Clear any selected conversation immediately
+        dispatch(setActiveConversation(null));
+      } else {
+        console.log(
+          "[Herbie] Request already processed, skipping:",
+          requestKey
+        );
+      }
     }
 
-    // Always clear any selected conversation on mount
-    dispatch(setActiveConversation(null));
+    return () => {
+      processingRef.current = false;
+    };
   }, [dispatch]);
 
   useEffect(() => {
