@@ -169,7 +169,6 @@ export default function ChatSection() {
     if (initialBtnParam) {
       console.log("[Herbie] Processing initial btn param:", initialBtnParam);
       startNewConversation(initialBtnParam);
-      // Clear the param so we don't process it again
       setInitialBtnParam(null);
     }
   }, [initialBtnParam, startNewConversation]);
