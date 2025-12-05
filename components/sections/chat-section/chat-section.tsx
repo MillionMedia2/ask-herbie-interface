@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
@@ -16,8 +16,6 @@ import { addMessage, updateMessage } from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
-  const isProcessingRef = useRef(false);
-  const hasCheckedInitialUrlRef = useRef(false);
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
@@ -34,6 +32,32 @@ export default function ChatSection() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
     null
   );
+  // Track the initial btn param to process
+  const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
+
+  // Read btn param from URL on mount - BEFORE anything else
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const btnText = urlParams.get("btn");
+
+    console.log("[Herbie] Mount - URL:", window.location.href);
+    console.log("[Herbie] Mount - btn param:", btnText);
+
+    if (btnText) {
+      // Store the btn param to process
+      setInitialBtnParam(btnText);
+
+      // Clean URL immediately
+      const url = new URL(window.location.href);
+      url.searchParams.delete("btn");
+      window.history.replaceState({}, "", url.pathname);
+    }
+
+    // Always clear any selected conversation on mount
+    dispatch(setActiveConversation(null));
+  }, [dispatch]);
 
   useEffect(() => {
     if (activeConversationId && messages.length > 0) {
@@ -46,18 +70,11 @@ export default function ChatSection() {
     return words.length > 50 ? words.substring(0, 50) + "..." : words;
   };
 
-  const handleQuestionClick = useCallback(
+  const startNewConversation = useCallback(
     async (question: string) => {
       if (!question) return;
 
-      // Prevent concurrent calls (but allow if called from processBtnParam which already set this)
-      if (isProcessingRef.current) {
-        console.log("[Herbie] Already processing, skipping duplicate call");
-        return;
-      }
-
-      isProcessingRef.current = true;
-      console.log("[Herbie] handleQuestionClick called with:", question);
+      console.log("[Herbie] Starting new conversation with:", question);
 
       setShowSuggestions(false);
       const conversationId = Date.now().toString();
@@ -121,7 +138,6 @@ export default function ChatSection() {
             console.log("[Herbie] Stream complete");
             setIsLoading(false);
             setStreamingMessageId(null);
-            isProcessingRef.current = false;
           },
           onError: (error: Error) => {
             console.error("Streaming error:", error);
@@ -137,132 +153,26 @@ export default function ChatSection() {
             );
             setIsLoading(false);
             setStreamingMessageId(null);
-            isProcessingRef.current = false;
           },
         });
       } catch (error) {
-        console.error("[Herbie] Error in handleQuestionClick:", error);
+        console.error("[Herbie] Error:", error);
         setIsLoading(false);
         setStreamingMessageId(null);
-        isProcessingRef.current = false;
       }
     },
     [dispatch]
   );
 
-  // Function to process btn parameter from URL
-  const processBtnParam = useCallback(
-    (btnText: string) => {
-      if (!btnText) {
-        console.log("[Herbie] Skipping - no text");
-        return;
-      }
-
-      console.log("[Herbie] Processing btn param:", btnText);
-
-      // Clear any previously selected conversation
-      dispatch(setActiveConversation(null));
-
-      // Start the conversation (handleQuestionClick manages isProcessingRef)
-      handleQuestionClick(btnText);
-    },
-    [dispatch, handleQuestionClick]
-  );
-
-  // Check URL on mount - this runs BEFORE any URL cleanup
+  // Process the initial btn param after component is ready
   useEffect(() => {
-    if (hasCheckedInitialUrlRef.current) return;
-
-    console.log("[Herbie] Initial mount - checking URL");
-    hasCheckedInitialUrlRef.current = true;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const btnText = urlParams.get("btn");
-
-    console.log("[Herbie] Initial URL check - btnText:", btnText);
-
-    if (btnText) {
-      // Process the button text
-      processBtnParam(btnText);
-
-      // Clean URL after processing
-      setTimeout(() => {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("btn");
-        window.history.replaceState({}, "", url.pathname);
-        console.log("[Herbie] URL cleaned");
-      }, 500);
+    if (initialBtnParam) {
+      console.log("[Herbie] Processing initial btn param:", initialBtnParam);
+      startNewConversation(initialBtnParam);
+      // Clear the param so we don't process it again
+      setInitialBtnParam(null);
     }
-  }, [processBtnParam]);
-
-  // Listen for messages from parent WordPress page
-  useEffect(() => {
-    const handleParentMessage = (event: MessageEvent) => {
-      console.log("[Herbie] Received message:", event.data);
-
-      // Optional: Add origin check for security
-      // if (event.origin !== "https://plantz.io") return;
-
-      if (event.data?.type === "HERBIE_NEW_QUESTION" && event.data?.question) {
-        console.log("[Herbie] New question from parent:", event.data.question);
-
-        // Reset state for new question
-        hasCheckedInitialUrlRef.current = false;
-        isProcessingRef.current = false;
-        dispatch(setActiveConversation(null));
-
-        // Process the question
-        setTimeout(() => {
-          processBtnParam(event.data.question);
-        }, 100);
-      }
-    };
-
-    window.addEventListener("message", handleParentMessage);
-
-    return () => {
-      window.removeEventListener("message", handleParentMessage);
-    };
-  }, [processBtnParam, dispatch]);
-
-  // Handle back/forward navigation
-  useEffect(() => {
-    const handlePopState = () => {
-      console.log("[Herbie] popstate event");
-      const urlParams = new URLSearchParams(window.location.search);
-      const btnText = urlParams.get("btn");
-
-      if (btnText) {
-        hasCheckedInitialUrlRef.current = false;
-        isProcessingRef.current = false;
-        processBtnParam(btnText);
-      }
-    };
-
-    // Handle bfcache restoration
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        console.log("[Herbie] Page restored from bfcache");
-        hasCheckedInitialUrlRef.current = false;
-        isProcessingRef.current = false;
-        dispatch(setActiveConversation(null));
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const btnText = urlParams.get("btn");
-        if (btnText) {
-          processBtnParam(btnText);
-        }
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener("pageshow", handlePageShow);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("pageshow", handlePageShow);
-    };
-  }, [processBtnParam, dispatch]);
+  }, [initialBtnParam, startNewConversation]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -352,7 +262,6 @@ export default function ChatSection() {
     setShowSuggestions(true);
     setSidebarOpen(false);
     setStreamingMessageId(null);
-    isProcessingRef.current = false;
   };
 
   const handleConversationClick = () => {
@@ -400,7 +309,7 @@ export default function ChatSection() {
           onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           streamingMessageId={streamingMessageId}
-          onQuestionClick={handleQuestionClick}
+          onQuestionClick={startNewConversation}
         />
       </div>
 
@@ -414,7 +323,7 @@ export default function ChatSection() {
         {showSuggestions && (
           <ChatSuggestionsCard
             isLoading={isLoading}
-            onQuestionClick={handleQuestionClick}
+            onQuestionClick={startNewConversation}
           />
         )}
       </div>
