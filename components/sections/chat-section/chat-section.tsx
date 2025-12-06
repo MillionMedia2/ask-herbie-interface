@@ -80,6 +80,9 @@ export default function ChatSection() {
       url.searchParams.delete("btn");
       url.searchParams.delete("_t");
       window.history.replaceState({}, "", url.pathname);
+      // Reset to default behavior - no chat selected, show suggestions
+      dispatch(setActiveConversation(null));
+      setShowSuggestions(true);
       return;
     }
 
