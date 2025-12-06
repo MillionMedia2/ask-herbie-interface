@@ -26,12 +26,27 @@ export default function ChatSection() {
       : []
   );
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingConversationId, setLoadingConversationId] = useState<
+    string | null
+  >(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
     null
   );
+  const [streamingConversationId, setStreamingConversationId] = useState<
+    string | null
+  >(null);
+
+  // Only show loading state if we're viewing the conversation that's loading
+  const isLoading =
+    loadingConversationId !== null &&
+    loadingConversationId === activeConversationId;
+  // Only show streaming for the active conversation
+  const activeStreamingMessageId =
+    streamingConversationId === activeConversationId
+      ? streamingMessageId
+      : null;
   // Track the initial btn param to process
   const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
   // Ref to track if we've already processed the btn param in this render cycle
@@ -54,6 +69,19 @@ export default function ChatSection() {
     console.log("[Herbie] Mount - URL:", window.location.href);
     console.log("[Herbie] Mount - btn param:", btnText);
     console.log("[Herbie] Mount - timestamp:", timestamp);
+
+    // Skip if btn param is just the button label "Ask Herbie" (not an actual question)
+    if (btnText && btnText.toLowerCase().trim() === "ask herbie") {
+      console.log(
+        "[Herbie] Skipping - btn is just button label, not a question"
+      );
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("btn");
+      url.searchParams.delete("_t");
+      window.history.replaceState({}, "", url.pathname);
+      return;
+    }
 
     if (btnText) {
       // Create a unique key for this specific request
@@ -143,7 +171,7 @@ export default function ChatSection() {
         createdAt: new Date().toISOString(),
       };
       dispatch(addMessage(userMessage));
-      setIsLoading(true);
+      setLoadingConversationId(conversationId);
 
       const aiMessageId = (Date.now() + 1).toString();
       const aiMessage = {
@@ -155,6 +183,7 @@ export default function ChatSection() {
       };
       dispatch(addMessage(aiMessage));
       setStreamingMessageId(aiMessageId);
+      setStreamingConversationId(conversationId);
 
       let accumulatedContent = "";
       let hasReceivedFirstChunk = false;
@@ -166,7 +195,7 @@ export default function ChatSection() {
             accumulatedContent += chunk;
             if (!hasReceivedFirstChunk) {
               hasReceivedFirstChunk = true;
-              setIsLoading(false);
+              setLoadingConversationId(null);
             }
             dispatch(
               updateMessage({
@@ -180,8 +209,9 @@ export default function ChatSection() {
           },
           onComplete: () => {
             console.log("[Herbie] Stream complete");
-            setIsLoading(false);
+            setLoadingConversationId(null);
             setStreamingMessageId(null);
+            setStreamingConversationId(null);
           },
           onError: (error: Error) => {
             console.error("Streaming error:", error);
@@ -195,14 +225,16 @@ export default function ChatSection() {
                 },
               })
             );
-            setIsLoading(false);
+            setLoadingConversationId(null);
             setStreamingMessageId(null);
+            setStreamingConversationId(null);
           },
         });
       } catch (error) {
         console.error("[Herbie] Error:", error);
-        setIsLoading(false);
+        setLoadingConversationId(null);
         setStreamingMessageId(null);
+        setStreamingConversationId(null);
       }
     },
     [dispatch]
@@ -219,7 +251,6 @@ export default function ChatSection() {
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
-    setIsLoading(true);
     setShowSuggestions(false);
 
     let conversationId = activeConversationId;
@@ -237,6 +268,8 @@ export default function ChatSection() {
       );
       dispatch(setActiveConversation(conversationId));
     }
+
+    setLoadingConversationId(conversationId);
 
     const userMessage = {
       id: Date.now().toString(),
@@ -257,6 +290,7 @@ export default function ChatSection() {
     };
     dispatch(addMessage(aiMessage));
     setStreamingMessageId(aiMessageId);
+    setStreamingConversationId(conversationId);
 
     let accumulatedContent = "";
     let hasReceivedFirstChunk = false;
@@ -266,7 +300,7 @@ export default function ChatSection() {
         accumulatedContent += chunk;
         if (!hasReceivedFirstChunk) {
           hasReceivedFirstChunk = true;
-          setIsLoading(false);
+          setLoadingConversationId(null);
         }
         dispatch(
           updateMessage({
@@ -279,8 +313,9 @@ export default function ChatSection() {
         );
       },
       onComplete: () => {
-        setIsLoading(false);
+        setLoadingConversationId(null);
         setStreamingMessageId(null);
+        setStreamingConversationId(null);
       },
       onError: (error: Error) => {
         console.error("Streaming error:", error);
@@ -294,8 +329,9 @@ export default function ChatSection() {
             },
           })
         );
-        setIsLoading(false);
+        setLoadingConversationId(null);
         setStreamingMessageId(null);
+        setStreamingConversationId(null);
       },
     });
   };
@@ -351,7 +387,7 @@ export default function ChatSection() {
           showSuggestions={showSuggestions}
           onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          streamingMessageId={streamingMessageId}
+          streamingMessageId={activeStreamingMessageId}
           onQuestionClick={startNewConversation}
         />
       </div>
