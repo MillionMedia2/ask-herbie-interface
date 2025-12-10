@@ -64,10 +64,10 @@ export default function ChatMessages({
             const isLastMessage = index === messages.length - 1;
             const isAssistantMessage = message.senderId === "assistant";
             const isMessageComplete = message.content.trim().length > 0;
-            const isNotStreamingThisMessage = animatingMessageId !== message.id;
+            // Only show button when streaming is completely finished for this message
+            const isStreamingThisMessage = animatingMessageId === message.id;
 
-            const canShowButton =
-              isMessageComplete && (isNotStreamingThisMessage || !isLoading);
+            const canShowButton = isMessageComplete && !isStreamingThisMessage;
             const shouldShowButton =
               isLastMessage &&
               isAssistantMessage &&
@@ -88,10 +88,10 @@ export default function ChatMessages({
                   </div>
                 </div>
 
-                {/* View Recommended Products button */}
+                {/* View Recommended Products button - appears with smooth fade after stream ends */}
                 {shouldShowButton && (
                   <div className="flex flex-col gap-2 mt-4">
-                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-3 duration-500 ease-out">
                       <button
                         onClick={() => {
                           const userMessage = messages

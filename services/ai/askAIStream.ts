@@ -4,18 +4,24 @@ import { handleApiErrorWithoutException } from "@/lib/errorHandler";
 /**
  * Stream AI response using Server-Sent Events
  * @param question - The user's question
+ * @param conversationId - Optional conversation ID for maintaining context (backend's previous_response_id)
  * @param onChunk - Callback fired for each chunk of text received
+ * @param onConversationId - Callback fired when backend returns the conversation ID
  * @param onComplete - Callback fired when streaming completes
  * @param onError - Callback fired if an error occurs
  */
 export const askAIStream = async ({
   question,
+  conversationId,
   onChunk,
+  onConversationId,
   onComplete,
   onError,
 }: {
   question: string;
+  conversationId?: string;
   onChunk: (chunk: string) => void;
+  onConversationId?: (conversationId: string) => void;
   onComplete: () => void;
   onError: (error: Error) => void;
 }): Promise<void> => {
@@ -30,7 +36,7 @@ export const askAIStream = async ({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, conversationId }),
     });
 
     if (!response.ok) {
@@ -94,9 +100,22 @@ export const askAIStream = async ({
               onError(new Error(handledError.message || parsed.error));
               return;
             }
+            // Handle conversationId from backend (for maintaining conversation context)
+            if (parsed.type === "conversationId" && parsed.conversationId) {
+              onConversationId?.(parsed.conversationId);
+            }
             // Handle content - backend sends incremental chunks (one word at a time)
-            if (parsed.content !== undefined && parsed.content !== null) {
+            if (
+              parsed.type === "content" &&
+              parsed.content !== undefined &&
+              parsed.content !== null
+            ) {
               onChunk(parsed.content);
+            }
+            // Handle done event
+            if (parsed.type === "done") {
+              onComplete();
+              return;
             }
           } catch (e) {
             // If parsing fails, it might be plain text content
