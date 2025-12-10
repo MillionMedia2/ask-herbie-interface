@@ -72,10 +72,19 @@ export default function ChatSection() {
     console.log("[Herbie] Mount - btn param:", btnText);
     console.log("[Herbie] Mount - timestamp:", timestamp);
 
-    // Skip if btn param is just the button label "Ask Herbie" (not an actual question)
-    if (btnText && btnText.toLowerCase().trim() === "ask herbie") {
+    // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
+    const normalizedBtn = btnText?.toLowerCase().trim().replace(/\s+/g, " ");
+    const isButtonLabel =
+      normalizedBtn === "ask herbie" ||
+      normalizedBtn === "ask herbi" ||
+      normalizedBtn === "askherbie" ||
+      normalizedBtn === "askherbi" ||
+      normalizedBtn?.match(/^ask\s*herb(i|ie)?$/i);
+
+    if (btnText && isButtonLabel) {
       console.log(
-        "[Herbie] Skipping - btn is just button label, not a question"
+        "[Herbie] Skipping - btn is just button label, not a question:",
+        btnText
       );
       // Clean URL
       const url = new URL(window.location.href);
