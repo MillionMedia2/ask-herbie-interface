@@ -51,6 +51,8 @@ export default function ChatSection() {
   const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
   // Ref to track if we've already processed the btn param in this render cycle
   const processingRef = useRef(false);
+  // Track backend conversationIds (previous_response_id) by frontend conversationId
+  const backendConversationIds = useRef<Map<string, string>>(new Map());
 
   // Read btn param from URL on mount - using ref to handle Strict Mode
   useEffect(() => {
@@ -194,6 +196,7 @@ export default function ChatSection() {
       try {
         await askAIStream({
           question,
+          // New conversation, no backend conversationId yet
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
             if (!hasReceivedFirstChunk) {
@@ -209,6 +212,9 @@ export default function ChatSection() {
                 },
               })
             );
+          },
+          onConversationId: (backendId: string) => {
+            backendConversationIds.current.set(conversationId, backendId);
           },
           onComplete: () => {
             console.log("[Herbie] Stream complete");
@@ -297,8 +303,14 @@ export default function ChatSection() {
 
     let accumulatedContent = "";
     let hasReceivedFirstChunk = false;
+
+    // Get the backend conversationId for this conversation (if any)
+    const backendConversationId =
+      backendConversationIds.current.get(conversationId);
+
     await askAIStream({
       question: content,
+      conversationId: backendConversationId, // Pass backend's conversationId for conversation context
       onChunk: (chunk: string) => {
         accumulatedContent += chunk;
         if (!hasReceivedFirstChunk) {
@@ -314,6 +326,9 @@ export default function ChatSection() {
             },
           })
         );
+      },
+      onConversationId: (backendId: string) => {
+        backendConversationIds.current.set(conversationId, backendId);
       },
       onComplete: () => {
         setLoadingConversationId(null);
