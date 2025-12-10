@@ -31,6 +31,21 @@ export const conversationsSlice = createSlice({
     setActiveConversation: (state, action: PayloadAction<string | null>) => {
       state.activeConversationId = action.payload;
     },
+    renameConversation: (
+      state,
+      action: PayloadAction<{ id: string; title: string }>
+    ) => {
+      const index = state.list.findIndex((c) => c.id === action.payload.id);
+      if (index !== -1) {
+        state.list[index].title = action.payload.title;
+      }
+    },
+    togglePinConversation: (state, action: PayloadAction<string>) => {
+      const index = state.list.findIndex((c) => c.id === action.payload);
+      if (index !== -1) {
+        state.list[index].isPinned = !state.list[index].isPinned;
+      }
+    },
   },
 });
 
@@ -40,6 +55,8 @@ export const {
   updateConversation,
   removeConversation,
   setActiveConversation,
+  renameConversation,
+  togglePinConversation,
 } = conversationsSlice.actions;
 
 export default conversationsSlice.reducer;

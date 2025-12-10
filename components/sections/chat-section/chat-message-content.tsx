@@ -1,8 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { Copy, Check } from "lucide-react";
 
 interface ChatMessageContentProps {
   content: string;
@@ -28,63 +29,107 @@ function ChatMessageContent({
   onTypewriterComplete,
 }: ChatMessageContentProps) {
   const isAssistant = senderId === "assistant";
+  const [copied, setCopied] = useState(false);
 
   // Strip citation markers and memoize to avoid recalculating on every render
   const textToShow = useMemo(() => stripCitations(content), [content]);
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(textToShow);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy text:", err);
+    }
+  };
+
   return (
-    <div
-      className={cn(
-        "px-2 sm:px-4 py-3 rounded-2xl max-w-[93%] sm:max-w-[85%] wrap-break-word",
-        isAssistant
-          ? "bg-muted text-foreground"
-          : "bg-primary text-primary-foreground ml-auto"
-      )}
-      style={{
-        paddingLeft: "1rem",
-        paddingRight: "1rem",
-      }}
-    >
-      {isAssistant ? (
-        <div className="markdown-content">
-          <ReactMarkdown
-            components={{
-              h1: ({ children }) => (
-                <h1 className="text-lg font-semibold mt-3 mb-2">{children}</h1>
-              ),
-              h2: ({ children }) => (
-                <h2 className="text-base font-semibold mt-3 mb-2">
-                  {children}
-                </h2>
-              ),
-              h3: ({ children }) => (
-                <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>
-              ),
-              p: ({ children }) => (
-                <p className="mb-2 leading-relaxed">{children}</p>
-              ),
-              ul: ({ children }) => (
-                <ul className="list-disc space-y-1 my-2 ml-6">{children}</ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal space-y-1 my-2 ml-6">{children}</ol>
-              ),
-              li: ({ children }) => (
-                <li className="pl-1 leading-relaxed">{children}</li>
-              ),
-              strong: ({ children }) => (
-                <strong className="font-semibold text-foreground">
-                  {children}
-                </strong>
-              ),
-              em: ({ children }) => <em className="italic">{children}</em>,
-            }}
-          >
-            {textToShow}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <div className="whitespace-pre-wrap">{textToShow}</div>
+    <div className="flex flex-col gap-1 w-full">
+      <div
+        className={cn(
+          "px-2 sm:px-4 py-3 w-fit rounded-2xl max-w-[93%] sm:max-w-[85%] wrap-break-word",
+          isAssistant
+            ? "bg-muted text-foreground"
+            : "bg-primary text-primary-foreground ml-auto"
+        )}
+        style={{
+          paddingLeft: "1rem",
+          paddingRight: "1rem",
+        }}
+      >
+        {isAssistant ? (
+          <div className="markdown-content">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h1 className="text-lg font-semibold mt-3 mb-2">
+                    {children}
+                  </h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-base font-semibold mt-3 mb-2">
+                    {children}
+                  </h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-sm font-semibold mt-2 mb-1">
+                    {children}
+                  </h3>
+                ),
+                p: ({ children }) => (
+                  <p className="mb-2 leading-relaxed">{children}</p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc space-y-1 my-2 ml-6">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal space-y-1 my-2 ml-6">
+                    {children}
+                  </ol>
+                ),
+                li: ({ children }) => (
+                  <li className="pl-1 leading-relaxed">{children}</li>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-foreground">
+                    {children}
+                  </strong>
+                ),
+                em: ({ children }) => <em className="italic">{children}</em>,
+              }}
+            >
+              {textToShow}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <div className="whitespace-pre-wrap">{textToShow}</div>
+        )}
+      </div>
+      {content.trim() && (
+        <button
+          onClick={handleCopy}
+          className={cn(
+            "flex items-center gap-1 px-1.5 py-0.5 text-xs rounded transition-all w-fit",
+            isAssistant
+              ? "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              : "text-primary/70 hover:text-primary hover:bg-primary/5 ml-auto"
+          )}
+          aria-label="Copy message"
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <>
+              <Check size={11} className="text-green-500" />
+              <span className="text-green-500">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={11} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
       )}
     </div>
   );

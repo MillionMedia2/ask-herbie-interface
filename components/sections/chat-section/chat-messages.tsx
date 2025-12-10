@@ -3,7 +3,7 @@
 import { useAppSelector } from "@/redux/store";
 import ChatMessageContent from "./chat-message-content";
 import ProductsCarousel from "../products/products-carousel";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import type { Message } from "./types";
 import { useChatHook } from "@/hooks/use-chat-hook";
 
@@ -12,6 +12,7 @@ interface ChatMessagesProps {
   isLoading: boolean;
   animatingMessageId: string | null;
   onProductsVisibilityChange?: (visible: boolean) => void;
+  onRegenerateResponse?: (userMessage: string) => void;
 }
 
 export default function ChatMessages({
@@ -19,6 +20,7 @@ export default function ChatMessages({
   isLoading,
   animatingMessageId,
   onProductsVisibilityChange,
+  onRegenerateResponse,
 }: ChatMessagesProps) {
   const conversationId = messages[0]?.conversationId || null;
   const productsListRaw = useAppSelector((state) =>
@@ -88,10 +90,10 @@ export default function ChatMessages({
                   </div>
                 </div>
 
-                {/* View Recommended Products button - appears with smooth fade after stream ends */}
+                {/* Action buttons - appears with smooth fade after stream ends */}
                 {shouldShowButton && (
                   <div className="flex flex-col gap-2 mt-4">
-                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-3 duration-500 ease-out">
+                    <div className="flex justify-start gap-2 animate-in fade-in slide-in-from-bottom-3 duration-500 ease-out">
                       <button
                         onClick={() => {
                           const userMessage = messages
@@ -111,6 +113,27 @@ export default function ChatMessages({
                           ? "Loading Products..."
                           : "View Recommended Products"}
                       </button>
+
+                      {onRegenerateResponse && (
+                        <button
+                          onClick={() => {
+                            const userMessage = messages
+                              .slice(0, index)
+                              .reverse()
+                              .find((m) => m.senderId === "user");
+
+                            if (userMessage) {
+                              onRegenerateResponse(userMessage.content);
+                            }
+                          }}
+                          disabled={isLoading}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground font-medium text-sm transition-all duration-200 hover:scale-105 w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Regenerate response"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span className="hidden sm:inline">Regenerate</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* No Products Found Message */}
@@ -145,17 +168,17 @@ export default function ChatMessages({
                           : "hidden",
                     }}
                   >
-                    <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl p-3 sm:p-6 border border-primary/20 w-full max-w-full overflow-hidden">
+                    <div className="bg-linear-to-r from-primary/5 to-accent/5 rounded-2xl p-3 sm:p-6 border border-primary/20 w-full max-w-full overflow-hidden">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                          <Sparkles className="w-5 h-5 text-primary shrink-0" />
                           <h3 className="text-base sm:text-lg font-semibold text-primary">
                             Herbie's Curated Products
                           </h3>
                         </div>
                         <button
                           onClick={() => handleHideProducts(message.id)}
-                          className="text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
                         >
                           Hide
                         </button>
