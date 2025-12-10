@@ -46,9 +46,25 @@ export const messagesSlice = createSlice({
         Object.assign(message, updates);
       }
     },
+    removeMessage: (
+      state,
+      action: PayloadAction<{ id: string; conversationId: string }>
+    ) => {
+      const { id, conversationId } = action.payload;
+      if (state.byConversation[conversationId]) {
+        state.byConversation[conversationId] = state.byConversation[
+          conversationId
+        ].filter((m) => m.id !== id);
+      }
+    },
   },
 });
 
-export const { setMessages, addMessage, clearMessages, updateMessage } =
-  messagesSlice.actions;
+export const {
+  setMessages,
+  addMessage,
+  clearMessages,
+  updateMessage,
+  removeMessage,
+} = messagesSlice.actions;
 export default messagesSlice.reducer;

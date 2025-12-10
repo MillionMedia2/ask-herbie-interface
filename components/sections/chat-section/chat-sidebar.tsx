@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Search, Plus, MessageSquare, Trash2, X } from "lucide-react";
+import {
+  Search,
+  Plus,
+  MessageSquare,
+  Trash2,
+  X,
+  Pin,
+  Edit2,
+  Check,
+} from "lucide-react";
 import {
   removeConversation,
   setActiveConversation,
+  renameConversation,
+  togglePinConversation,
 } from "@/redux/features/conversations-slice";
 import { clearMessages } from "@/redux/features/messages-slice";
 import { clearProducts } from "@/redux/features/products-slice";
@@ -44,12 +55,25 @@ export default function ChatSidebar({
   );
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [conversationToDelete, setConversationToDelete] = useState<
+    string | null
+  >(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Sort conversations: pinned first, then by date
+  const sortedAndFilteredConversations = conversations
+    .filter((conv) =>
+      conv.title.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Pinned conversations come first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      // Then sort by date (newest first)
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
 
   const handleDeleteClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -94,6 +118,33 @@ export default function ChatSidebar({
     dispatch(setActiveConversation(null));
     onNewConversation?.();
     onClose?.();
+  };
+
+  const handlePinClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    dispatch(togglePinConversation(id));
+  };
+
+  const handleRenameClick = (
+    conv: { id: string; title: string },
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    setEditingId(conv.id);
+    setEditingTitle(conv.title);
+  };
+
+  const handleRenameSubmit = (id: string) => {
+    if (editingTitle.trim()) {
+      dispatch(renameConversation({ id, title: editingTitle.trim() }));
+    }
+    setEditingId(null);
+    setEditingTitle("");
+  };
+
+  const handleRenameCancelOrBlur = () => {
+    setEditingId(null);
+    setEditingTitle("");
   };
 
   return (
@@ -142,43 +193,124 @@ export default function ChatSidebar({
             Saved Chats
           </h3>
 
-          {filteredConversations.length === 0 ? (
+          {sortedAndFilteredConversations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No saved conversations
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredConversations.map((conv) => (
+              {sortedAndFilteredConversations.map((conv) => (
                 <div
                   key={conv.id}
-                  onClick={() => handleConversationClick(conv.id)}
-                  className={`group flex items-start justify-between rounded-lg p-3 cursor-pointer transition-colors ${
+                  onClick={() =>
+                    editingId !== conv.id && handleConversationClick(conv.id)
+                  }
+                  className={`group flex flex-col rounded-lg p-3 ${
+                    editingId !== conv.id ? "cursor-pointer" : ""
+                  } transition-colors ${
                     activeConversationId === conv.id
                       ? "bg-primary/20 border border-primary/50"
                       : "hover:bg-sidebar-accent/10"
                   }`}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare
-                        size={14}
-                        className="flex-shrink-0 text-sidebar-accent"
-                      />
-                      <p className="truncate text-sm font-medium text-sidebar-foreground">
-                        {conv.title}
-                      </p>
+                  <div className="flex items-start justify-between w-full gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {editingId !== conv.id && (
+                          <>
+                            <MessageSquare
+                              size={14}
+                              className="shrink-0 text-sidebar-accent"
+                            />
+                            {conv.isPinned && (
+                              <Pin
+                                size={12}
+                                className="shrink-0 text-primary fill-primary"
+                              />
+                            )}
+                          </>
+                        )}
+                        {editingId === conv.id ? (
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onBlur={handleRenameCancelOrBlur}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleRenameSubmit(conv.id);
+                              } else if (e.key === "Escape") {
+                                handleRenameCancelOrBlur();
+                              }
+                            }}
+                            className="w-full bg-background border border-primary rounded px-2 py-1 text-sm font-medium text-sidebar-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <p className="truncate text-sm font-medium text-sidebar-foreground">
+                            {conv.title}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    {editingId === conv.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameSubmit(conv.id);
+                        }}
+                        className="rounded p-1.5 hover:bg-primary/10 transition-all shrink-0 self-start"
+                        aria-label="Save rename"
+                      >
+                        <Check size={16} className="text-primary" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-1 w-full">
+                    <p className="text-xs text-muted-foreground">
                       {new Date(conv.updatedAt).toLocaleDateString()}
                     </p>
+                    {editingId !== conv.id && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={(e) => handlePinClick(conv.id, e)}
+                          className={`rounded p-1.5 transition-all md:opacity-0 md:group-hover:opacity-100 hover:bg-primary/10 ${
+                            conv.isPinned ? "md:opacity-100" : ""
+                          }`}
+                          aria-label={
+                            conv.isPinned
+                              ? "Unpin conversation"
+                              : "Pin conversation"
+                          }
+                        >
+                          <Pin
+                            size={14}
+                            className={
+                              conv.isPinned
+                                ? "text-primary fill-primary"
+                                : "text-muted-foreground"
+                            }
+                          />
+                        </button>
+                        <button
+                          onClick={(e) => handleRenameClick(conv, e)}
+                          className="rounded p-1.5 transition-all md:opacity-0 md:group-hover:opacity-100 hover:bg-primary/10"
+                          aria-label="Rename conversation"
+                        >
+                          <Edit2 size={14} className="text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteClick(conv.id, e)}
+                          className="rounded p-1.5 transition-all md:opacity-0 md:group-hover:opacity-100 hover:bg-destructive/10"
+                          aria-label="Delete conversation"
+                        >
+                          <Trash2 size={14} className="text-destructive" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteClick(conv.id, e)}
-                    className="ml-2 flex-shrink-0 rounded p-1 opacity-0 transition-all hover:bg-destructive/10 group-hover:opacity-100"
-                    aria-label="Delete conversation"
-                  >
-                    <Trash2 size={14} className="text-destructive" />
-                  </button>
                 </div>
               ))}
             </div>
@@ -186,16 +318,20 @@ export default function ChatSidebar({
         </div>
       </div>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this conversation? This action cannot be undone.
+              Are you sure you want to delete this conversation? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
+            <AlertDialogCancel
               onClick={handleDeleteCancel}
               className="hover:bg-primary hover:text-primary-foreground"
             >

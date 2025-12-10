@@ -13,6 +13,8 @@ interface Props {
   onToggleSidebar: () => void;
   streamingMessageId: string | null;
   onQuestionClick: (question: string) => void;
+  onRegenerateResponse?: (userMessage: string) => void;
+  conversationTitle?: string;
 }
 
 export default function ChatMainCard({
@@ -23,12 +25,18 @@ export default function ChatMainCard({
   onToggleSidebar,
   streamingMessageId,
   onQuestionClick,
+  onRegenerateResponse,
+  conversationTitle,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-card border border-[#D0D0D0] dark:border-border rounded-[14px] shadow-[0_4px_14px_rgba(0,0,0,0.08)] overflow-hidden">
-      <ChatHeader onSidebarToggle={onToggleSidebar} />
+      <ChatHeader
+        onSidebarToggle={onToggleSidebar}
+        messages={messages}
+        conversationTitle={conversationTitle}
+      />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden sm:p-4 p-2 min-h-0">
         {showSuggestions && !hasMessages ? (
@@ -75,6 +83,7 @@ export default function ChatMainCard({
             messages={messages}
             isLoading={isLoading}
             animatingMessageId={streamingMessageId}
+            onRegenerateResponse={onRegenerateResponse}
           />
         )}
       </div>

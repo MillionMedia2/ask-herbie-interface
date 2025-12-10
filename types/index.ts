@@ -20,6 +20,7 @@ export interface IConversation {
   participants: string[];
   lastMessage?: string;
   updatedAt: string;
+  isPinned?: boolean;
 }
 
 export interface IMessage {

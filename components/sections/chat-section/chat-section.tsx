@@ -12,13 +12,22 @@ import {
   addConversation,
   setActiveConversation,
 } from "@/redux/features/conversations-slice";
-import { addMessage, updateMessage } from "@/redux/features/messages-slice";
+import {
+  addMessage,
+  updateMessage,
+  removeMessage,
+} from "@/redux/features/messages-slice";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
 
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
+  );
+  const activeConversation = useAppSelector((state) =>
+    activeConversationId
+      ? state.conversations.list.find((c) => c.id === activeConversationId)
+      : null
   );
   const messages = useAppSelector((state) =>
     activeConversationId
@@ -375,6 +384,94 @@ export default function ChatSection() {
     setStreamingMessageId(null);
   };
 
+  const handleRegenerateResponse = useCallback(
+    async (userMessage: string) => {
+      if (!activeConversationId) return;
+
+      // Find the last assistant message and remove it
+      const lastAssistantMessage = [...messages]
+        .reverse()
+        .find((m) => m.senderId === "assistant");
+
+      if (lastAssistantMessage) {
+        dispatch(
+          removeMessage({
+            id: lastAssistantMessage.id,
+            conversationId: activeConversationId,
+          })
+        );
+      }
+
+      // Now resend the user message to get a new response
+      setLoadingConversationId(activeConversationId);
+
+      const aiMessageId = Date.now().toString();
+      const aiMessage = {
+        id: aiMessageId,
+        conversationId: activeConversationId,
+        senderId: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+      };
+      dispatch(addMessage(aiMessage));
+      setStreamingMessageId(aiMessageId);
+      setStreamingConversationId(activeConversationId);
+
+      let accumulatedContent = "";
+      let hasReceivedFirstChunk = false;
+
+      // Get the backend conversationId for this conversation (if any)
+      const backendConversationId =
+        backendConversationIds.current.get(activeConversationId);
+
+      await askAIStream({
+        question: userMessage,
+        conversationId: backendConversationId,
+        onChunk: (chunk: string) => {
+          accumulatedContent += chunk;
+          if (!hasReceivedFirstChunk) {
+            hasReceivedFirstChunk = true;
+            setLoadingConversationId(null);
+          }
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId: activeConversationId,
+              updates: {
+                content: accumulatedContent,
+              },
+            })
+          );
+        },
+        onConversationId: (backendId: string) => {
+          backendConversationIds.current.set(activeConversationId, backendId);
+        },
+        onComplete: () => {
+          setLoadingConversationId(null);
+          setStreamingMessageId(null);
+          setStreamingConversationId(null);
+        },
+        onError: (error: Error) => {
+          console.error("Streaming error:", error);
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId: activeConversationId,
+              updates: {
+                content:
+                  "Something went wrong while fetching the response. Please try again.",
+              },
+            })
+          );
+          setLoadingConversationId(null);
+          setStreamingMessageId(null);
+          setStreamingConversationId(null);
+        },
+      });
+    },
+    [activeConversationId, messages, dispatch]
+  );
+
   return (
     <div className="flex h-full w-full bg-background overflow-hidden p-[5px]">
       <div
@@ -416,6 +513,8 @@ export default function ChatSection() {
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           streamingMessageId={activeStreamingMessageId}
           onQuestionClick={startNewConversation}
+          onRegenerateResponse={handleRegenerateResponse}
+          conversationTitle={activeConversation?.title || "Chat"}
         />
       </div>
 
