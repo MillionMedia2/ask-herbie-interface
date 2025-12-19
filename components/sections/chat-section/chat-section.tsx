@@ -76,10 +76,12 @@ export default function ChatSection() {
     const urlParams = new URLSearchParams(window.location.search);
     const btnText = urlParams.get("btn");
     const timestamp = urlParams.get("_t"); // Get the timestamp from WordPress
+    const token = urlParams.get("token"); // Get the token from WordPress
 
     console.log("[Herbie] Mount - URL:", window.location.href);
     console.log("[Herbie] Mount - btn param:", btnText);
     console.log("[Herbie] Mount - timestamp:", timestamp);
+    console.log("[Herbie] Mount - TOKEN:", token);
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
     const normalizedBtn = btnText?.toLowerCase().trim().replace(/\s+/g, " ");
@@ -99,6 +101,7 @@ export default function ChatSection() {
       const url = new URL(window.location.href);
       url.searchParams.delete("btn");
       url.searchParams.delete("_t");
+      url.searchParams.delete("token");
       window.history.replaceState({}, "", url.pathname);
       // Reset to default behavior - no chat selected, show suggestions
       dispatch(setActiveConversation(null));
@@ -137,6 +140,7 @@ export default function ChatSection() {
         const url = new URL(window.location.href);
         url.searchParams.delete("btn");
         url.searchParams.delete("_t");
+        url.searchParams.delete("token");
         window.history.replaceState({}, "", url.pathname);
 
         // Clear any selected conversation immediately
