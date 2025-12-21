@@ -47,6 +47,12 @@ export default function ChatSection() {
   const [streamingConversationId, setStreamingConversationId] = useState<
     string | null
   >(null);
+  const [userInfo, setUserInfo] = useState<{
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+  } | null>(null);
 
   // Only show loading state if we're viewing the conversation that's loading
   const isLoading =
@@ -90,14 +96,18 @@ export default function ChatSection() {
       try {
         const userInfo = await logWordPressUserInfo(token);
         console.log("[Herbie] WordPress user info:", userInfo);
+        setUserInfo(userInfo);
       } catch (error) {
         console.error("[Herbie] Failed to fetch user info:", error);
+        setUserInfo(null);
       }
     };
 
     // Call fetchUserInfo directly instead of nesting useEffect
     if (token) {
       fetchUserInfo();
+    } else {
+      setUserInfo(null);
     }
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
@@ -536,6 +546,7 @@ export default function ChatSection() {
           onQuestionClick={startNewConversation}
           onRegenerateResponse={handleRegenerateResponse}
           conversationTitle={activeConversation?.title || "Chat"}
+          userInfo={userInfo}
         />
       </div>
 
