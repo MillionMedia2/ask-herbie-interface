@@ -94,11 +94,11 @@ export default function ChatSection() {
         console.error("[Herbie] Failed to fetch user info:", error);
       }
     };
-    useEffect(() => {
-      if (token) {
-        fetchUserInfo();
-      }
-    }, [token]);
+
+    // Call fetchUserInfo directly instead of nesting useEffect
+    if (token) {
+      fetchUserInfo();
+    }
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
     const normalizedBtn = btnText?.toLowerCase().trim().replace(/\s+/g, " ");
