@@ -76,7 +76,6 @@ export default function ChatSection() {
 
     // Prevent double-processing in React Strict Mode
     if (processingRef.current) {
-      console.log("[Herbie] Already processing, skipping...");
       return;
     }
 
@@ -85,20 +84,13 @@ export default function ChatSection() {
     const timestamp = urlParams.get("_t"); // Get the timestamp from WordPress
     const token = urlParams.get("token"); // Get the token from WordPress
 
-    console.log("[Herbie] Mount - URL:", window.location.href);
-    console.log("[Herbie] Mount - btn param:", btnText);
-    console.log("[Herbie] Mount - timestamp:", timestamp);
-    console.log("[Herbie] Mount - TOKEN:", token);
-
-    // Fetch and log WordPress user info if token is available
+    // Fetch WordPress user info if token is available
     const fetchUserInfo = async () => {
       if (!token) return;
       try {
         const userInfo = await logWordPressUserInfo(token);
-        console.log("[Herbie] WordPress user info:", userInfo);
         setUserInfo(userInfo);
       } catch (error) {
-        console.error("[Herbie] Failed to fetch user info:", error);
         setUserInfo(null);
       }
     };
@@ -120,10 +112,6 @@ export default function ChatSection() {
       normalizedBtn?.match(/^ask\s*herb(i|ie)?$/i);
 
     if (btnText && isButtonLabel) {
-      console.log(
-        "[Herbie] Skipping - btn is just button label, not a question:",
-        btnText
-      );
       // Clean URL
       const url = new URL(window.location.href);
       url.searchParams.delete("btn");
@@ -144,7 +132,6 @@ export default function ChatSection() {
       const alreadyProcessed = sessionStorage.getItem(requestKey);
 
       if (!alreadyProcessed) {
-        console.log("[Herbie] New request, processing...");
         processingRef.current = true;
 
         // Mark this request as processed
@@ -172,11 +159,6 @@ export default function ChatSection() {
 
         // Clear any selected conversation immediately
         dispatch(setActiveConversation(null));
-      } else {
-        console.log(
-          "[Herbie] Request already processed, skipping:",
-          requestKey
-        );
       }
     }
 
@@ -199,8 +181,6 @@ export default function ChatSection() {
   const startNewConversation = useCallback(
     async (question: string) => {
       if (!question) return;
-
-      console.log("[Herbie] Starting new conversation with:", question);
 
       setShowSuggestions(false);
       const conversationId = Date.now().toString();
@@ -266,13 +246,11 @@ export default function ChatSection() {
             backendConversationIds.current.set(conversationId, backendId);
           },
           onComplete: () => {
-            console.log("[Herbie] Stream complete");
             setLoadingConversationId(null);
             setStreamingMessageId(null);
             setStreamingConversationId(null);
           },
           onError: (error: Error) => {
-            console.error("Streaming error:", error);
             dispatch(
               updateMessage({
                 id: aiMessageId,
@@ -289,7 +267,6 @@ export default function ChatSection() {
           },
         });
       } catch (error) {
-        console.error("[Herbie] Error:", error);
         setLoadingConversationId(null);
         setStreamingMessageId(null);
         setStreamingConversationId(null);
@@ -301,7 +278,6 @@ export default function ChatSection() {
   // Process the initial btn param after component is ready
   useEffect(() => {
     if (initialBtnParam) {
-      console.log("[Herbie] Processing initial btn param:", initialBtnParam);
       startNewConversation(initialBtnParam);
       setInitialBtnParam(null);
     }
@@ -385,7 +361,6 @@ export default function ChatSection() {
         setStreamingConversationId(null);
       },
       onError: (error: Error) => {
-        console.error("Streaming error:", error);
         dispatch(
           updateMessage({
             id: aiMessageId,
@@ -483,7 +458,6 @@ export default function ChatSection() {
           setStreamingConversationId(null);
         },
         onError: (error: Error) => {
-          console.error("Streaming error:", error);
           dispatch(
             updateMessage({
               id: aiMessageId,

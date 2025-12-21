@@ -1,3 +1,4 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const WORDPRESS_URL = process.env.NEXT_PUBLIC_WORDPRESS_URL;
 
-export { API_URL };
+export { API_URL, WORDPRESS_URL };

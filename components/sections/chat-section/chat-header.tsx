@@ -48,7 +48,6 @@ export default function ChatHeader({
     try {
       await exportChatAsPDF(messages, conversationTitle);
     } catch (error) {
-      console.error("Export failed:", error);
       alert("Failed to export as PDF. Please try TXT export instead.");
     } finally {
       setExporting(false);
