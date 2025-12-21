@@ -85,11 +85,20 @@ export default function ChatSection() {
     console.log("[Herbie] Mount - TOKEN:", token);
 
     // Fetch and log WordPress user info if token is available
-    if (token) {
-      logWordPressUserInfo(token).catch((error) => {
+    const fetchUserInfo = async () => {
+      if (!token) return;
+      try {
+        const userInfo = await logWordPressUserInfo(token);
+        console.log("[Herbie] WordPress user info:", userInfo);
+      } catch (error) {
         console.error("[Herbie] Failed to fetch user info:", error);
-      });
-    }
+      }
+    };
+    useEffect(() => {
+      if (token) {
+        fetchUserInfo();
+      }
+    }, [token]);
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
     const normalizedBtn = btnText?.toLowerCase().trim().replace(/\s+/g, " ");
