@@ -17,6 +17,7 @@ import {
   updateMessage,
   removeMessage,
 } from "@/redux/features/messages-slice";
+import { logWordPressUserInfo } from "@/api/userInfo";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
@@ -82,6 +83,13 @@ export default function ChatSection() {
     console.log("[Herbie] Mount - btn param:", btnText);
     console.log("[Herbie] Mount - timestamp:", timestamp);
     console.log("[Herbie] Mount - TOKEN:", token);
+
+    // Fetch and log WordPress user info if token is available
+    if (token) {
+      logWordPressUserInfo(token).catch((error) => {
+        console.error("[Herbie] Failed to fetch user info:", error);
+      });
+    }
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
     const normalizedBtn = btnText?.toLowerCase().trim().replace(/\s+/g, " ");
