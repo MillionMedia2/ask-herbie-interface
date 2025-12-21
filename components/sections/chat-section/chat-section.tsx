@@ -11,13 +11,22 @@ import { askAIStream } from "@/services/ai/askAIStream";
 import {
   addConversation,
   setActiveConversation,
+  setConversations,
+  updateConversation,
 } from "@/redux/features/conversations-slice";
 import {
   addMessage,
   updateMessage,
   removeMessage,
+  setMessages,
 } from "@/redux/features/messages-slice";
 import { logWordPressUserInfo } from "@/api/userInfo";
+import {
+  fetchConversations,
+  createConversation,
+} from "@/services/api/conversations";
+import { fetchMessages, createMessage } from "@/services/api/messages";
+import { isActionError } from "@/lib/error";
 
 export default function ChatSection() {
   const dispatch = useDispatch<AppDispatch>();
@@ -53,6 +62,8 @@ export default function ChatSection() {
     email: string;
     username: string;
   } | null>(null);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState<string | null>(null);
 
   // Only show loading state if we're viewing the conversation that's loading
   const isLoading =
@@ -69,6 +80,49 @@ export default function ChatSection() {
   const processingRef = useRef(false);
   // Track backend conversationIds (previous_response_id) by frontend conversationId
   const backendConversationIds = useRef<Map<string, string>>(new Map());
+
+  // Fetch conversations on mount
+  useEffect(() => {
+    const loadConversations = async () => {
+      setLoadingConversations(true);
+      try {
+        const result = await fetchConversations();
+        if (!isActionError(result) && Array.isArray(result)) {
+          dispatch(setConversations(result));
+        }
+      } catch (error) {
+        // Silently fail - conversations will be empty
+      } finally {
+        setLoadingConversations(false);
+      }
+    };
+    loadConversations();
+  }, [dispatch]);
+
+  // Fetch messages when a conversation is selected (but not when streaming)
+  useEffect(() => {
+    if (activeConversationId && !streamingMessageId) {
+      const loadMessages = async () => {
+        setLoadingMessages(activeConversationId);
+        try {
+          const result = await fetchMessages(activeConversationId);
+          if (!isActionError(result) && Array.isArray(result)) {
+            dispatch(
+              setMessages({
+                conversationId: activeConversationId,
+                messages: result,
+              })
+            );
+          }
+        } catch (error) {
+          // Silently fail - messages will not be loaded
+        } finally {
+          setLoadingMessages(null);
+        }
+      };
+      loadMessages();
+    }
+  }, [activeConversationId, dispatch, streamingMessageId]);
 
   // Read btn param from URL on mount - using ref to handle Strict Mode
   useEffect(() => {
@@ -183,46 +237,57 @@ export default function ChatSection() {
       if (!question) return;
 
       setShowSuggestions(false);
-      const conversationId = Date.now().toString();
       const conversationTitle = getConversationTitle(question);
 
-      dispatch(
-        addConversation({
-          id: conversationId,
+      try {
+        // Create conversation via API
+        const conversationResult = await createConversation({
           title: conversationTitle,
           participants: ["user", "assistant"],
-          updatedAt: new Date().toISOString(),
-        })
-      );
-      dispatch(setActiveConversation(conversationId));
-      setSidebarOpen(false);
+        });
 
-      const userMessage = {
-        id: Date.now().toString(),
-        conversationId,
-        senderId: "user",
-        content: question,
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(userMessage));
-      setLoadingConversationId(conversationId);
+        if (isActionError(conversationResult)) {
+          return;
+        }
 
-      const aiMessageId = (Date.now() + 1).toString();
-      const aiMessage = {
-        id: aiMessageId,
-        conversationId,
-        senderId: "assistant",
-        content: "",
-        createdAt: new Date().toISOString(),
-      };
-      dispatch(addMessage(aiMessage));
-      setStreamingMessageId(aiMessageId);
-      setStreamingConversationId(conversationId);
+        const conversationId = (conversationResult as any).id;
+        if (!conversationId) {
+          return;
+        }
 
-      let accumulatedContent = "";
-      let hasReceivedFirstChunk = false;
+        dispatch(addConversation(conversationResult as any));
+        dispatch(setActiveConversation(conversationId));
+        setSidebarOpen(false);
 
-      try {
+        // Create user message via API
+        const userMessageResult = await createMessage({
+          conversationId,
+          senderId: "user",
+          content: question,
+        });
+
+        if (isActionError(userMessageResult)) {
+          return;
+        }
+
+        dispatch(addMessage(userMessageResult as any));
+        setLoadingConversationId(conversationId);
+
+        const aiMessageId = `temp-${Date.now()}`;
+        const aiMessage = {
+          id: aiMessageId,
+          conversationId,
+          senderId: "assistant",
+          content: "",
+          createdAt: new Date().toISOString(),
+        };
+        dispatch(addMessage(aiMessage));
+        setStreamingMessageId(aiMessageId);
+        setStreamingConversationId(conversationId);
+
+        let accumulatedContent = "";
+        let hasReceivedFirstChunk = false;
+
         await askAIStream({
           question,
           // New conversation, no backend conversationId yet
@@ -245,7 +310,20 @@ export default function ChatSection() {
           onConversationId: (backendId: string) => {
             backendConversationIds.current.set(conversationId, backendId);
           },
-          onComplete: () => {
+          onComplete: async () => {
+            // Create assistant message via API
+            const assistantMessageResult = await createMessage({
+              conversationId,
+              senderId: "assistant",
+              content: accumulatedContent,
+            });
+
+            if (!isActionError(assistantMessageResult)) {
+              // Remove temp message and add real one
+              dispatch(removeMessage({ id: aiMessageId, conversationId }));
+              dispatch(addMessage(assistantMessageResult as any));
+            }
+
             setLoadingConversationId(null);
             setStreamingMessageId(null);
             setStreamingConversationId(null);
@@ -289,93 +367,130 @@ export default function ChatSection() {
 
     let conversationId = activeConversationId;
     if (!conversationId) {
-      conversationId = Date.now().toString();
       const conversationTitle = getConversationTitle(content);
 
-      dispatch(
-        addConversation({
-          id: conversationId,
+      try {
+        // Create conversation via API
+        const conversationResult = await createConversation({
           title: conversationTitle,
           participants: ["user", "assistant"],
-          updatedAt: new Date().toISOString(),
-        })
-      );
-      dispatch(setActiveConversation(conversationId));
+        });
+
+        if (isActionError(conversationResult)) {
+          return;
+        }
+
+        conversationId = (conversationResult as any).id;
+        if (!conversationId) {
+          return;
+        }
+        dispatch(addConversation(conversationResult as any));
+        dispatch(setActiveConversation(conversationId));
+      } catch (error) {
+        return;
+      }
+    }
+
+    if (!conversationId) {
+      return;
     }
 
     setLoadingConversationId(conversationId);
 
-    const userMessage = {
-      id: Date.now().toString(),
-      conversationId,
-      senderId: "user",
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    dispatch(addMessage(userMessage));
+    try {
+      // Create user message via API
+      const userMessageResult = await createMessage({
+        conversationId,
+        senderId: "user",
+        content,
+      });
 
-    const aiMessageId = (Date.now() + 1).toString();
-    const aiMessage = {
-      id: aiMessageId,
-      conversationId,
-      senderId: "assistant",
-      content: "",
-      createdAt: new Date().toISOString(),
-    };
-    dispatch(addMessage(aiMessage));
-    setStreamingMessageId(aiMessageId);
-    setStreamingConversationId(conversationId);
+      if (isActionError(userMessageResult)) {
+        return;
+      }
 
-    let accumulatedContent = "";
-    let hasReceivedFirstChunk = false;
+      dispatch(addMessage(userMessageResult as any));
 
-    // Get the backend conversationId for this conversation (if any)
-    const backendConversationId =
-      backendConversationIds.current.get(conversationId);
+      const aiMessageId = `temp-${Date.now()}`;
+      const aiMessage = {
+        id: aiMessageId,
+        conversationId,
+        senderId: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+      };
+      dispatch(addMessage(aiMessage));
+      setStreamingMessageId(aiMessageId);
+      setStreamingConversationId(conversationId);
 
-    await askAIStream({
-      question: content,
-      conversationId: backendConversationId, // Pass backend's conversationId for conversation context
-      onChunk: (chunk: string) => {
-        accumulatedContent += chunk;
-        if (!hasReceivedFirstChunk) {
-          hasReceivedFirstChunk = true;
-          setLoadingConversationId(null);
-        }
-        dispatch(
-          updateMessage({
-            id: aiMessageId,
-            conversationId,
-            updates: {
+      let accumulatedContent = "";
+      let hasReceivedFirstChunk = false;
+
+      // Get the backend conversationId for this conversation (if any)
+      const backendConversationId =
+        backendConversationIds.current.get(conversationId) || undefined;
+
+      await askAIStream({
+        question: content,
+        conversationId: backendConversationId, // Pass backend's conversationId for conversation context
+        onChunk: (chunk: string) => {
+          accumulatedContent += chunk;
+          if (!hasReceivedFirstChunk) {
+            hasReceivedFirstChunk = true;
+            setLoadingConversationId(null);
+          }
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId,
+              updates: {
+                content: accumulatedContent,
+              },
+            })
+          );
+        },
+        onConversationId: (backendId: string) => {
+          backendConversationIds.current.set(conversationId, backendId);
+        },
+        onComplete: async () => {
+          // Create assistant message via API
+          if (conversationId) {
+            const assistantMessageResult = await createMessage({
+              conversationId,
+              senderId: "assistant",
               content: accumulatedContent,
-            },
-          })
-        );
-      },
-      onConversationId: (backendId: string) => {
-        backendConversationIds.current.set(conversationId, backendId);
-      },
-      onComplete: () => {
-        setLoadingConversationId(null);
-        setStreamingMessageId(null);
-        setStreamingConversationId(null);
-      },
-      onError: (error: Error) => {
-        dispatch(
-          updateMessage({
-            id: aiMessageId,
-            conversationId,
-            updates: {
-              content:
-                "Something went wrong while fetching the response. Please try again.",
-            },
-          })
-        );
-        setLoadingConversationId(null);
-        setStreamingMessageId(null);
-        setStreamingConversationId(null);
-      },
-    });
+            });
+
+            if (!isActionError(assistantMessageResult)) {
+              // Remove temp message and add real one
+              dispatch(removeMessage({ id: aiMessageId, conversationId }));
+              dispatch(addMessage(assistantMessageResult as any));
+            }
+          }
+
+          setLoadingConversationId(null);
+          setStreamingMessageId(null);
+          setStreamingConversationId(null);
+        },
+        onError: (error: Error) => {
+          dispatch(
+            updateMessage({
+              id: aiMessageId,
+              conversationId,
+              updates: {
+                content:
+                  "Something went wrong while fetching the response. Please try again.",
+              },
+            })
+          );
+          setLoadingConversationId(null);
+          setStreamingMessageId(null);
+          setStreamingConversationId(null);
+        },
+      });
+    } catch (error) {
+      setLoadingConversationId(null);
+    }
   };
 
   const handleNewConversation = () => {
@@ -411,7 +526,7 @@ export default function ChatSection() {
       // Now resend the user message to get a new response
       setLoadingConversationId(activeConversationId);
 
-      const aiMessageId = Date.now().toString();
+      const aiMessageId = `temp-${Date.now()}`;
       const aiMessage = {
         id: aiMessageId,
         conversationId: activeConversationId,
@@ -432,7 +547,7 @@ export default function ChatSection() {
 
       await askAIStream({
         question: userMessage,
-        conversationId: backendConversationId,
+        conversationId: backendConversationId || undefined,
         onChunk: (chunk: string) => {
           accumulatedContent += chunk;
           if (!hasReceivedFirstChunk) {
@@ -450,9 +565,31 @@ export default function ChatSection() {
           );
         },
         onConversationId: (backendId: string) => {
-          backendConversationIds.current.set(activeConversationId, backendId);
+          if (activeConversationId) {
+            backendConversationIds.current.set(activeConversationId, backendId);
+          }
         },
-        onComplete: () => {
+        onComplete: async () => {
+          // Create assistant message via API
+          if (activeConversationId) {
+            const assistantMessageResult = await createMessage({
+              conversationId: activeConversationId,
+              senderId: "assistant",
+              content: accumulatedContent,
+            });
+
+            if (!isActionError(assistantMessageResult)) {
+              // Remove temp message and add real one
+              dispatch(
+                removeMessage({
+                  id: aiMessageId,
+                  conversationId: activeConversationId,
+                })
+              );
+              dispatch(addMessage(assistantMessageResult as any));
+            }
+          }
+
           setLoadingConversationId(null);
           setStreamingMessageId(null);
           setStreamingConversationId(null);
@@ -493,6 +630,8 @@ export default function ChatSection() {
             setShowSuggestions(true);
           }}
           isLoading={isLoading}
+          loadingConversations={loadingConversations}
+          loadingMessages={loadingMessages}
         />
       </div>
 
