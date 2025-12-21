@@ -17,12 +17,19 @@ interface ChatHeaderProps {
   onSidebarToggle: () => void;
   messages?: IMessage[];
   conversationTitle?: string;
+  userInfo?: {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+  } | null;
 }
 
 export default function ChatHeader({
   onSidebarToggle,
   messages = [],
   conversationTitle = "Chat",
+  userInfo,
 }: ChatHeaderProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -73,7 +80,7 @@ export default function ChatHeader({
                 className="w-10 h-10 object-contain dark:invert"
               />
               <h1 className="text-lg sm:text-xl font-semibold text-foreground">
-                Herbie
+                {userInfo ? "Ask Herbie" : "Herbie"}
               </h1>
             </div>
           </div>

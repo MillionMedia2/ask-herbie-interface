@@ -15,6 +15,12 @@ interface Props {
   onQuestionClick: (question: string) => void;
   onRegenerateResponse?: (userMessage: string) => void;
   conversationTitle?: string;
+  userInfo?: {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+  } | null;
 }
 
 export default function ChatMainCard({
@@ -27,6 +33,7 @@ export default function ChatMainCard({
   onQuestionClick,
   onRegenerateResponse,
   conversationTitle,
+  userInfo,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
@@ -36,13 +43,23 @@ export default function ChatMainCard({
         onSidebarToggle={onToggleSidebar}
         messages={messages}
         conversationTitle={conversationTitle}
+        userInfo={userInfo}
       />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden sm:p-4 p-2 min-h-0">
         {showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">
-              Hey there, I'm <span className="text-primary">Herbie</span>
+              {userInfo ? (
+                <>
+                  Hey there {userInfo.name.split(" ")[0]}, I'm{" "}
+                  <span className="text-primary">Herbie</span>
+                </>
+              ) : (
+                <>
+                  Hey there, I'm <span className="text-primary">Herbie</span>
+                </>
+              )}
             </h2>
             <p className="max-w-md text-sm leading-relaxed mb-4">
               I'm your AI natural remedy companion. Ask me anything about
