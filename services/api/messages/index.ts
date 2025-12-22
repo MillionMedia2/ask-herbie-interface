@@ -60,3 +60,21 @@ export const createMessage = async (data: {
     return handleApiErrorWithoutException(error);
   }
 };
+
+export const deleteMessage = async (messageId: string) => {
+  const axiosInstance = await getServerAxios();
+  try {
+    const response = await axiosInstance.delete(`/messages/${messageId}`);
+
+    if (response.data.success) {
+      return { success: true };
+    }
+
+    return handleApiErrorWithoutException(
+      new Error("Failed to delete message")
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    return handleApiErrorWithoutException(error);
+  }
+};

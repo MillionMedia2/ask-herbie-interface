@@ -50,6 +50,12 @@ interface ChatSidebarProps {
   isLoading?: boolean;
   loadingConversations?: boolean;
   loadingMessages?: string | null;
+  userInfo?: {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+  } | null;
 }
 
 export default function ChatSidebar({
@@ -60,12 +66,16 @@ export default function ChatSidebar({
   isLoading,
   loadingConversations = false,
   loadingMessages = null,
+  userInfo,
 }: ChatSidebarProps) {
   const dispatch = useDispatch<AppDispatch>();
   const conversations = useAppSelector((state) => state.conversations.list);
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
   );
+
+  // Hide conversations if user is not logged in
+  const shouldShowConversations = !!userInfo;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [conversationToDelete, setConversationToDelete] = useState<
@@ -253,7 +263,11 @@ export default function ChatSidebar({
             Saved Chats
           </h3>
 
-          {loadingConversations ? (
+          {!shouldShowConversations ? (
+            <p className="text-sm text-muted-foreground">
+              Please log in to view your conversations
+            </p>
+          ) : loadingConversations ? (
             <div className="flex items-center justify-center py-4">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-50"></div>
             </div>
