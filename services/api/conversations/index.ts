@@ -30,13 +30,21 @@ export const fetchConversations = async () => {
 export const createConversation = async (data: {
   title: string;
   participants?: string[];
+  userId?: number;
 }) => {
   const axiosInstance = await getServerAxios();
   try {
-    const response = await axiosInstance.post(`/conversations`, {
+    const requestBody: any = {
       title: data.title,
       participants: data.participants || ["user", "assistant"],
-    });
+    };
+
+    // Add userId if provided (for logged-in users)
+    if (data.userId !== undefined) {
+      requestBody.userId = data.userId;
+    }
+
+    const response = await axiosInstance.post(`/conversations`, requestBody);
 
     if (response.data.success && response.data.data) {
       const conv = response.data.data;
@@ -50,7 +58,9 @@ export const createConversation = async (data: {
       };
     }
 
-    return handleApiErrorWithoutException(new Error("Failed to create conversation"));
+    return handleApiErrorWithoutException(
+      new Error("Failed to create conversation")
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return handleApiErrorWithoutException(error);
@@ -63,7 +73,10 @@ export const updateConversation = async (
 ) => {
   const axiosInstance = await getServerAxios();
   try {
-    const response = await axiosInstance.put(`/conversations/${id}`, updateData);
+    const response = await axiosInstance.put(
+      `/conversations/${id}`,
+      updateData
+    );
 
     if (response.data.success && response.data.data) {
       const conv = response.data.data;
@@ -77,7 +90,9 @@ export const updateConversation = async (
       };
     }
 
-    return handleApiErrorWithoutException(new Error("Failed to update conversation"));
+    return handleApiErrorWithoutException(
+      new Error("Failed to update conversation")
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return handleApiErrorWithoutException(error);
@@ -93,7 +108,9 @@ export const deleteConversation = async (id: string) => {
       return { success: true };
     }
 
-    return handleApiErrorWithoutException(new Error("Failed to delete conversation"));
+    return handleApiErrorWithoutException(
+      new Error("Failed to delete conversation")
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return handleApiErrorWithoutException(error);
@@ -119,10 +136,11 @@ export const pinConversation = async (id: string, isPinned: boolean) => {
       };
     }
 
-    return handleApiErrorWithoutException(new Error("Failed to pin conversation"));
+    return handleApiErrorWithoutException(
+      new Error("Failed to pin conversation")
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return handleApiErrorWithoutException(error);
   }
 };
-

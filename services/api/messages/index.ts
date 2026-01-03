@@ -31,14 +31,22 @@ export const createMessage = async (data: {
   conversationId: string;
   senderId: string;
   content: string;
+  userId?: number;
 }) => {
   const axiosInstance = await getServerAxios();
   try {
-    const response = await axiosInstance.post(`/messages`, {
+    const requestBody: any = {
       conversationId: data.conversationId,
       senderId: data.senderId,
       content: data.content,
-    });
+    };
+
+    // Add userId if provided (for logged-in users)
+    if (data.userId !== undefined) {
+      requestBody.userId = data.userId;
+    }
+
+    const response = await axiosInstance.post(`/messages`, requestBody);
 
     if (response.data.success && response.data.data) {
       const msg = response.data.data;

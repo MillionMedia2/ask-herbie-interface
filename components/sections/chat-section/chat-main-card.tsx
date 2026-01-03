@@ -53,24 +53,35 @@ export default function ChatMainCard({
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3">
               <div className="flex gap-2">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                ></div>
               </div>
-              <p className="text-sm text-muted-foreground">Loading messages...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading messages...
+              </p>
             </div>
           </div>
         ) : showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">
-              {userInfo ? (
+              {userInfo?.name ? (
                 <>
                   Hey there {userInfo.name.split(" ")[0]}, I'm{" "}
                   <span className="text-primary">Herbie</span>
                 </>
               ) : (
                 <>
-              Hey there, I'm <span className="text-primary">Herbie</span>
+                  Hey there, I'm <span className="text-primary">Herbie</span>
                 </>
               )}
             </h2>

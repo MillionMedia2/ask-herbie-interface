@@ -57,6 +57,7 @@ export function useChatSection() {
   const [streamingConversationId, setStreamingConversationId] = useState<
     string | null
   >(null);
+  const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState<string | null>(null);
@@ -82,10 +83,11 @@ export function useChatSection() {
     return words.length > 50 ? words.substring(0, 50) + "..." : words;
   };
 
-  // Fetch conversations on mount (only if user is logged in)
+  // Fetch conversations on mount (only if user is logged in with valid token)
   useEffect(() => {
-    if (!userInfo) {
-      // Clear conversations if user logs out
+    // Only proceed if both token and userInfo are valid
+    if (!token || !userInfo) {
+      // Clear conversations if user logs out or token is invalid
       dispatch(setConversations([]));
       return;
     }
@@ -104,7 +106,7 @@ export function useChatSection() {
       }
     };
     loadConversations();
-  }, [dispatch, userInfo]);
+  }, [dispatch, userInfo, token]);
 
   // Fetch messages when a conversation is selected (but not when streaming)
   useEffect(() => {
@@ -158,23 +160,34 @@ export function useChatSection() {
     const urlParams = new URLSearchParams(window.location.search);
     const btnText = urlParams.get("btn");
     const timestamp = urlParams.get("_t"); // Get the timestamp from WordPress
-    const token = urlParams.get("token"); // Get the token from WordPress
+    const tokenParam = urlParams.get("token"); // Get the token from WordPress
 
-    // Fetch WordPress user info if token is available
-    const fetchUserInfo = async () => {
-      if (!token) return;
-      try {
-        const userInfo = await logWordPressUserInfo(token);
-        setUserInfo(userInfo);
-      } catch (error) {
-        setUserInfo(null);
-      }
-    };
+    // Validate token: must be a non-empty string (not null, not empty string)
+    // This prevents empty strings from being treated as valid tokens
+    const isValidToken = tokenParam && tokenParam.trim().length > 0;
 
-    // Call fetchUserInfo directly instead of nesting useEffect
-    if (token) {
+    // Store token as string if valid, otherwise null
+    if (isValidToken && tokenParam) {
+      const trimmedToken = tokenParam.trim();
+      setToken(trimmedToken);
+
+      // Fetch WordPress user info if token is valid
+      const fetchUserInfo = async () => {
+        try {
+          const userInfo = await logWordPressUserInfo(trimmedToken);
+
+          setUserInfo(userInfo);
+        } catch (error) {
+          // If auth fails, clear both token and userInfo
+          setUserInfo(null);
+          setToken(null);
+        }
+      };
+
       fetchUserInfo();
     } else {
+      // No valid token - clear both token and userInfo
+      setToken(null);
       setUserInfo(null);
     }
 
@@ -255,8 +268,9 @@ export function useChatSection() {
 
       setShowSuggestions(false);
 
-      // If user is not logged in, use temporary conversation (not saved to backend)
-      if (!userInfo) {
+      // If user is not logged in or token is invalid, use temporary conversation (not saved to backend)
+      // Check both token and userInfo to ensure we have valid authentication
+      if (!token || !userInfo) {
         const tempConversationId = `temp-${Date.now()}`;
 
         // Create local user message for UI only (not saved to backend)
@@ -350,10 +364,11 @@ export function useChatSection() {
       const conversationTitle = getConversationTitle(question);
 
       try {
-        // Create conversation via API
+        // create conversation via API
         const conversationResult = await createConversation({
           title: conversationTitle,
           participants: ["user", "assistant"],
+          userId: userInfo.id,
         });
 
         if (isActionError(conversationResult)) {
@@ -375,6 +390,7 @@ export function useChatSection() {
           conversationId,
           senderId: "user",
           content: question,
+          userId: userInfo.id,
         });
 
         if (isActionError(userMessageResult)) {
@@ -433,6 +449,7 @@ export function useChatSection() {
               conversationId,
               senderId: "assistant",
               content: accumulatedContent,
+              userId: userInfo.id,
             });
 
             if (!isActionError(assistantMessageResult)) {
@@ -467,7 +484,7 @@ export function useChatSection() {
         setStreamingConversationId(null);
       }
     },
-    [dispatch, userInfo]
+    [dispatch, userInfo, token]
   );
 
   // Process the initial btn param after component is ready
@@ -483,8 +500,9 @@ export function useChatSection() {
       if (!content.trim()) return;
       setShowSuggestions(false);
 
-      // If user is not logged in, use temporary conversation (not saved to backend)
-      if (!userInfo) {
+      // If user is not logged in or token is invalid, use temporary conversation (not saved to backend)
+      // Check both token and userInfo to ensure we have valid authentication
+      if (!token || !userInfo) {
         const tempConversationId = activeConversationId || `temp-${Date.now()}`;
 
         // Create local user message for UI only (not saved to backend)
@@ -586,6 +604,7 @@ export function useChatSection() {
           const conversationResult = await createConversation({
             title: conversationTitle,
             participants: ["user", "assistant"],
+            userId: userInfo.id,
           });
 
           if (isActionError(conversationResult)) {
@@ -615,6 +634,7 @@ export function useChatSection() {
           conversationId,
           senderId: "user",
           content,
+          userId: userInfo.id,
         });
 
         if (isActionError(userMessageResult)) {
@@ -679,6 +699,7 @@ export function useChatSection() {
                 conversationId,
                 senderId: "assistant",
                 content: accumulatedContent,
+                userId: userInfo.id,
               });
 
               if (!isActionError(assistantMessageResult)) {
@@ -712,7 +733,7 @@ export function useChatSection() {
         setLoadingConversationId(null);
       }
     },
-    [activeConversationId, dispatch, userInfo]
+    [activeConversationId, dispatch, userInfo, token]
   );
 
   const handleNewConversation = useCallback(() => {
@@ -735,8 +756,9 @@ export function useChatSection() {
       // Just send a new query to get a new response
       setLoadingConversationId(activeConversationId);
 
-      // If user is not logged in, use temporary conversation
-      if (!userInfo) {
+      // If user is not logged in or token is invalid, use temporary conversation
+      // Check both token and userInfo to ensure we have valid authentication
+      if (!token || !userInfo) {
         // Create local user message for UI only (not saved to backend)
         const localUserMessage = {
           id: `local-user-${Date.now()}`,
@@ -827,6 +849,7 @@ export function useChatSection() {
           conversationId: activeConversationId,
           senderId: "user",
           content: userMessage,
+          userId: userInfo.id,
         });
 
         if (isActionError(userMessageResult)) {
@@ -888,6 +911,7 @@ export function useChatSection() {
               conversationId: activeConversationId,
               senderId: "assistant",
               content: accumulatedContent,
+              userId: userInfo.id,
             });
 
             if (!isActionError(assistantMessageResult)) {
@@ -923,7 +947,7 @@ export function useChatSection() {
         },
       });
     },
-    [activeConversationId, messages, dispatch, userInfo]
+    [activeConversationId, messages, dispatch, userInfo, token]
   );
 
   const handleEmptyConversations = useCallback(() => {
