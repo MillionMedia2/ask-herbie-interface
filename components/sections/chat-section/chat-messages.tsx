@@ -57,7 +57,9 @@ export default function ChatMessages({
           {messages.map((message, index) => {
             const shouldAnimate = message.id === animatingMessageId;
 
-            // Don't render empty assistant messages
+            // Don't render empty assistant messages - only show when content starts streaming
+            // If it's an assistant message with no content, don't render it at all
+            // The thinking indicator will show instead
             if (message.senderId === "assistant" && !message.content.trim()) {
               return null;
             }
