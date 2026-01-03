@@ -118,7 +118,10 @@ export default function ChatSidebar({
 
         // Refresh conversations list
         const conversationsResult = await fetchConversations();
-        if (!isActionError(conversationsResult) && Array.isArray(conversationsResult)) {
+        if (
+          !isActionError(conversationsResult) &&
+          Array.isArray(conversationsResult)
+        ) {
           dispatch(setConversations(conversationsResult));
         }
 
@@ -170,7 +173,10 @@ export default function ChatSidebar({
 
         // Refresh conversations list to get updated order
         const conversationsResult = await fetchConversations();
-        if (!isActionError(conversationsResult) && Array.isArray(conversationsResult)) {
+        if (
+          !isActionError(conversationsResult) &&
+          Array.isArray(conversationsResult)
+        ) {
           dispatch(setConversations(conversationsResult));
         }
       }
@@ -200,7 +206,10 @@ export default function ChatSidebar({
 
           // Refresh conversations list
           const conversationsResult = await fetchConversations();
-          if (!isActionError(conversationsResult) && Array.isArray(conversationsResult)) {
+          if (
+            !isActionError(conversationsResult) &&
+            Array.isArray(conversationsResult)
+          ) {
             dispatch(setConversations(conversationsResult));
           }
         }
@@ -339,7 +348,8 @@ export default function ChatSidebar({
                     </div>
                     {editingId === conv.id && (
                       <button
-                        onClick={(e) => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           handleRenameSubmit(conv.id);
                         }}
