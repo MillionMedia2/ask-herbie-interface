@@ -59,6 +59,7 @@ export function useChatSection() {
   >(null);
   const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [loadingToken, setLoadingToken] = useState(true);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState<string | null>(null);
   const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
@@ -170,6 +171,7 @@ export function useChatSection() {
     if (isValidToken && tokenParam) {
       const trimmedToken = tokenParam.trim();
       setToken(trimmedToken);
+      setLoadingToken(true);
 
       // Fetch WordPress user info if token is valid
       const fetchUserInfo = async () => {
@@ -181,6 +183,8 @@ export function useChatSection() {
           // If auth fails, clear both token and userInfo
           setUserInfo(null);
           setToken(null);
+        } finally {
+          setLoadingToken(false);
         }
       };
 
@@ -189,6 +193,7 @@ export function useChatSection() {
       // No valid token - clear both token and userInfo
       setToken(null);
       setUserInfo(null);
+      setLoadingToken(false);
     }
 
     // Skip if btn param is just a button label like "Ask Herbie", "Ask Herbi", etc. (not an actual question)
@@ -963,6 +968,7 @@ export function useChatSection() {
     sidebarOpen,
     showSuggestions,
     userInfo,
+    loadingToken,
     loadingConversations,
     loadingMessages,
     // Computed
