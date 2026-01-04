@@ -13,6 +13,7 @@ export default function ChatSection() {
     sidebarOpen,
     showSuggestions,
     userInfo,
+    loadingToken,
     loadingConversations,
     loadingMessages,
     // Computed
@@ -41,6 +42,7 @@ export default function ChatSection() {
           onConversationClick={handleConversationClick}
           onEmptyConversations={handleEmptyConversations}
           isLoading={isLoading}
+          loadingToken={loadingToken}
           loadingConversations={loadingConversations}
           loadingMessages={loadingMessages}
           userInfo={userInfo}

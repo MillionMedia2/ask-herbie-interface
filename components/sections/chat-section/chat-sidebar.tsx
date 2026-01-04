@@ -31,6 +31,7 @@ import {
   fetchConversations,
 } from "@/services/api/conversations";
 import { isActionError } from "@/lib/error";
+import type { IConversation } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,7 @@ interface ChatSidebarProps {
   onConversationClick?: () => void;
   onEmptyConversations?: () => void;
   isLoading?: boolean;
+  loadingToken?: boolean;
   loadingConversations?: boolean;
   loadingMessages?: string | null;
   userInfo?: {
@@ -64,6 +66,7 @@ export default function ChatSidebar({
   onConversationClick,
   onEmptyConversations,
   isLoading,
+  loadingToken = false,
   loadingConversations = false,
   loadingMessages = null,
   userInfo,
@@ -84,6 +87,7 @@ export default function ChatSidebar({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   // Sort conversations: pinned first, then by date
   const sortedAndFilteredConversations = conversations
@@ -168,7 +172,7 @@ export default function ChatSidebar({
     try {
       const result = await pinConversationAPI(id, !conversation.isPinned);
       if (!isActionError(result)) {
-        dispatch(updateConversation(result));
+        dispatch(updateConversation(result as IConversation));
         dispatch(togglePinConversation(id));
 
         // Refresh conversations list to get updated order
@@ -196,12 +200,13 @@ export default function ChatSidebar({
 
   const handleRenameSubmit = async (id: string) => {
     if (editingTitle.trim()) {
+      setRenamingId(id);
       try {
         const result = await updateConversationAPI(id, {
           title: editingTitle.trim(),
         });
         if (!isActionError(result)) {
-          dispatch(updateConversation(result));
+          dispatch(updateConversation(result as IConversation));
           dispatch(renameConversation({ id, title: editingTitle.trim() }));
 
           // Refresh conversations list
@@ -215,10 +220,15 @@ export default function ChatSidebar({
         }
       } catch (error) {
         console.error("Failed to rename conversation:", error);
+      } finally {
+        setRenamingId(null);
+        setEditingId(null);
+        setEditingTitle("");
       }
+    } else {
+      setEditingId(null);
+      setEditingTitle("");
     }
-    setEditingId(null);
-    setEditingTitle("");
   };
 
   const handleRenameCancelOrBlur = () => {
@@ -272,7 +282,11 @@ export default function ChatSidebar({
             Saved Chats
           </h3>
 
-          {!shouldShowConversations ? (
+          {loadingToken ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-50"></div>
+            </div>
+          ) : !shouldShowConversations ? (
             <p className="text-sm text-muted-foreground">
               Please log in to view your conversations
             </p>
@@ -353,10 +367,15 @@ export default function ChatSidebar({
                           e.stopPropagation();
                           handleRenameSubmit(conv.id);
                         }}
-                        className="rounded p-1.5 hover:bg-primary/10 transition-all shrink-0 self-start"
+                        disabled={renamingId === conv.id}
+                        className="rounded p-1.5 hover:bg-primary/10 transition-all shrink-0 self-start disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Save rename"
                       >
-                        <Check size={16} className="text-primary" />
+                        {renamingId === conv.id ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                        ) : (
+                          <Check size={16} className="text-primary" />
+                        )}
                       </button>
                     )}
                   </div>
