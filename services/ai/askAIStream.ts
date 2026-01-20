@@ -104,7 +104,16 @@ export const askAIStream = async ({
             if (parsed.type === "conversationId" && parsed.conversationId) {
               onConversationId?.(parsed.conversationId);
             }
-            // Handle content - backend sends incremental chunks (one word at a time)
+            // Handle content - backend sends { content: "chunk" } format
+            // Check for content field directly (backend sends { content: value } without type field)
+            if (
+              parsed.content !== undefined &&
+              parsed.content !== null &&
+              typeof parsed.content === "string"
+            ) {
+              onChunk(parsed.content);
+            }
+            // Also handle typed format for backward compatibility
             if (
               parsed.type === "content" &&
               parsed.content !== undefined &&
