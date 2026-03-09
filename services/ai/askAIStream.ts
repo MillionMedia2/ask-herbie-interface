@@ -104,22 +104,16 @@ export const askAIStream = async ({
             if (parsed.type === "conversationId" && parsed.conversationId) {
               onConversationId?.(parsed.conversationId);
             }
-            // Handle content - backend sends { content: "chunk" } format
-            // Check for content field directly (backend sends { content: value } without type field)
-            if (
+            // Handle content ONCE: backend sends either { content: "chunk" } or { type: "content", content: "chunk" }
+            // Do not call onChunk twice for the same event (was causing repeated words).
+            const content =
               parsed.content !== undefined &&
               parsed.content !== null &&
               typeof parsed.content === "string"
-            ) {
-              onChunk(parsed.content);
-            }
-            // Also handle typed format for backward compatibility
-            if (
-              parsed.type === "content" &&
-              parsed.content !== undefined &&
-              parsed.content !== null
-            ) {
-              onChunk(parsed.content);
+                ? parsed.content
+                : null;
+            if (content !== null) {
+              onChunk(content);
             }
             // Handle done event
             if (parsed.type === "done") {
