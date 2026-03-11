@@ -21,6 +21,7 @@ interface Props {
     email: string;
     username: string;
   } | null;
+  loadingMessages?: boolean;
 }
 
 export default function ChatMainCard({
@@ -34,6 +35,7 @@ export default function ChatMainCard({
   onRegenerateResponse,
   conversationTitle,
   userInfo,
+  loadingMessages = false,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
@@ -47,10 +49,32 @@ export default function ChatMainCard({
       />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden sm:p-4 p-2 min-h-0">
-        {showSuggestions && !hasMessages ? (
+        {loadingMessages ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex gap-2">
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                ></div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Loading messages...
+              </p>
+            </div>
+          </div>
+        ) : showSuggestions && !hasMessages ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <h2 className="text-2xl font-semibold mb-2">
-              {userInfo ? (
+              {userInfo?.name ? (
                 <>
                   Hey there {userInfo.name.split(" ")[0]}, I'm{" "}
                   <span className="text-primary">Herbie</span>

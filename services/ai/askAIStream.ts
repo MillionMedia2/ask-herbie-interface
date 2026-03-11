@@ -104,13 +104,16 @@ export const askAIStream = async ({
             if (parsed.type === "conversationId" && parsed.conversationId) {
               onConversationId?.(parsed.conversationId);
             }
-            // Handle content - backend sends incremental chunks (one word at a time)
-            if (
-              parsed.type === "content" &&
+            // Handle content ONCE: backend sends either { content: "chunk" } or { type: "content", content: "chunk" }
+            // Do not call onChunk twice for the same event (was causing repeated words).
+            const content =
               parsed.content !== undefined &&
-              parsed.content !== null
-            ) {
-              onChunk(parsed.content);
+              parsed.content !== null &&
+              typeof parsed.content === "string"
+                ? parsed.content
+                : null;
+            if (content !== null) {
+              onChunk(content);
             }
             // Handle done event
             if (parsed.type === "done") {

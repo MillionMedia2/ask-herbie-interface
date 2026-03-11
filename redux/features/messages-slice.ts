@@ -39,6 +39,9 @@ export const messagesSlice = createSlice({
       }>
     ) => {
       const { id, conversationId, updates } = action.payload;
+      if (!state.byConversation[conversationId]) {
+        state.byConversation[conversationId] = [];
+      }
       const message = state.byConversation[conversationId].find(
         (m) => m.id === id
       );

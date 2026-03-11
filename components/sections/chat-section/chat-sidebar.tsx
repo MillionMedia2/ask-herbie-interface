@@ -17,11 +17,21 @@ import {
   setActiveConversation,
   renameConversation,
   togglePinConversation,
+  updateConversation,
+  setConversations,
 } from "@/redux/features/conversations-slice";
 import { clearMessages } from "@/redux/features/messages-slice";
 import { clearProducts } from "@/redux/features/products-slice";
 import { useAppSelector } from "@/redux/store";
 import type { AppDispatch } from "@/redux/store";
+import {
+  deleteConversation,
+  updateConversation as updateConversationAPI,
+  pinConversation as pinConversationAPI,
+  fetchConversations,
+} from "@/services/api/conversations";
+import { isActionError } from "@/lib/error";
+import type { IConversation } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +49,15 @@ interface ChatSidebarProps {
   onConversationClick?: () => void;
   onEmptyConversations?: () => void;
   isLoading?: boolean;
+  loadingToken?: boolean;
+  loadingConversations?: boolean;
+  loadingMessages?: string | null;
+  userInfo?: {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+  } | null;
 }
 
 export default function ChatSidebar({
@@ -47,12 +66,19 @@ export default function ChatSidebar({
   onConversationClick,
   onEmptyConversations,
   isLoading,
+  loadingToken = false,
+  loadingConversations = false,
+  loadingMessages = null,
+  userInfo,
 }: ChatSidebarProps) {
   const dispatch = useDispatch<AppDispatch>();
   const conversations = useAppSelector((state) => state.conversations.list);
   const activeConversationId = useAppSelector(
     (state) => state.conversations.activeConversationId
   );
+
+  // Hide conversations if user is not logged in
+  const shouldShowConversations = !!userInfo;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [conversationToDelete, setConversationToDelete] = useState<
@@ -61,6 +87,7 @@ export default function ChatSidebar({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   // Sort conversations: pinned first, then by date
   const sortedAndFilteredConversations = conversations
@@ -81,22 +108,39 @@ export default function ChatSidebar({
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!conversationToDelete) return;
 
     const id = conversationToDelete;
-    dispatch(removeConversation(id));
-    dispatch(clearMessages(id));
-    dispatch(clearProducts(id));
 
-    if (conversations.length === 1) {
-      dispatch(setActiveConversation(null));
-      onEmptyConversations?.();
-    } else {
-      if (activeConversationId === id) {
-        dispatch(setActiveConversation(null));
+    try {
+      const result = await deleteConversation(id);
+      if (!isActionError(result)) {
+        dispatch(removeConversation(id));
+        dispatch(clearMessages(id));
+        dispatch(clearProducts(id));
+
+        // Refresh conversations list
+        const conversationsResult = await fetchConversations();
+        if (
+          !isActionError(conversationsResult) &&
+          Array.isArray(conversationsResult)
+        ) {
+          dispatch(setConversations(conversationsResult));
+        }
+
+        if (conversations.length === 1) {
+          dispatch(setActiveConversation(null));
+          onEmptyConversations?.();
+        } else {
+          if (activeConversationId === id) {
+            dispatch(setActiveConversation(null));
+          }
+          onNewConversation?.();
+        }
       }
-      onNewConversation?.();
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
     }
 
     setIsDeleteDialogOpen(false);
@@ -120,9 +164,29 @@ export default function ChatSidebar({
     onClose?.();
   };
 
-  const handlePinClick = (id: string, e: React.MouseEvent) => {
+  const handlePinClick = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatch(togglePinConversation(id));
+    const conversation = conversations.find((c) => c.id === id);
+    if (!conversation) return;
+
+    try {
+      const result = await pinConversationAPI(id, !conversation.isPinned);
+      if (!isActionError(result)) {
+        dispatch(updateConversation(result as IConversation));
+        dispatch(togglePinConversation(id));
+
+        // Refresh conversations list to get updated order
+        const conversationsResult = await fetchConversations();
+        if (
+          !isActionError(conversationsResult) &&
+          Array.isArray(conversationsResult)
+        ) {
+          dispatch(setConversations(conversationsResult));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to pin conversation:", error);
+    }
   };
 
   const handleRenameClick = (
@@ -134,12 +198,37 @@ export default function ChatSidebar({
     setEditingTitle(conv.title);
   };
 
-  const handleRenameSubmit = (id: string) => {
+  const handleRenameSubmit = async (id: string) => {
     if (editingTitle.trim()) {
-      dispatch(renameConversation({ id, title: editingTitle.trim() }));
+      setRenamingId(id);
+      try {
+        const result = await updateConversationAPI(id, {
+          title: editingTitle.trim(),
+        });
+        if (!isActionError(result)) {
+          dispatch(updateConversation(result as IConversation));
+          dispatch(renameConversation({ id, title: editingTitle.trim() }));
+
+          // Refresh conversations list
+          const conversationsResult = await fetchConversations();
+          if (
+            !isActionError(conversationsResult) &&
+            Array.isArray(conversationsResult)
+          ) {
+            dispatch(setConversations(conversationsResult));
+          }
+        }
+      } catch (error) {
+        console.error("Failed to rename conversation:", error);
+      } finally {
+        setRenamingId(null);
+        setEditingId(null);
+        setEditingTitle("");
+      }
+    } else {
+      setEditingId(null);
+      setEditingTitle("");
     }
-    setEditingId(null);
-    setEditingTitle("");
   };
 
   const handleRenameCancelOrBlur = () => {
@@ -193,7 +282,19 @@ export default function ChatSidebar({
             Saved Chats
           </h3>
 
-          {sortedAndFilteredConversations.length === 0 ? (
+          {loadingToken ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-50"></div>
+            </div>
+          ) : !shouldShowConversations ? (
+            <p className="text-sm text-muted-foreground">
+              Please log in to view your conversations
+            </p>
+          ) : loadingConversations ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-50"></div>
+            </div>
+          ) : sortedAndFilteredConversations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No saved conversations
             </p>
@@ -205,7 +306,7 @@ export default function ChatSidebar({
                   onClick={() =>
                     editingId !== conv.id && handleConversationClick(conv.id)
                   }
-                  className={`group flex flex-col rounded-lg p-3 ${
+                  className={`group flex flex-col rounded-lg p-3 relative ${
                     editingId !== conv.id ? "cursor-pointer" : ""
                   } transition-colors ${
                     activeConversationId === conv.id
@@ -213,6 +314,11 @@ export default function ChatSidebar({
                       : "hover:bg-sidebar-accent/10"
                   }`}
                 >
+                  {loadingMessages === conv.id && (
+                    <div className="absolute top-2 right-2">
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-50"></div>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between w-full gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -256,14 +362,20 @@ export default function ChatSidebar({
                     </div>
                     {editingId === conv.id && (
                       <button
-                        onClick={(e) => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           handleRenameSubmit(conv.id);
                         }}
-                        className="rounded p-1.5 hover:bg-primary/10 transition-all shrink-0 self-start"
+                        disabled={renamingId === conv.id}
+                        className="rounded p-1.5 hover:bg-primary/10 transition-all shrink-0 self-start disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Save rename"
                       >
-                        <Check size={16} className="text-primary" />
+                        {renamingId === conv.id ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                        ) : (
+                          <Check size={16} className="text-primary" />
+                        )}
                       </button>
                     )}
                   </div>
