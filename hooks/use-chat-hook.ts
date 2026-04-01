@@ -8,7 +8,9 @@ import {
   addProducts,
   setProductsVisibility,
 } from "@/redux/features/products-slice";
+import { updateMessage } from "@/redux/features/messages-slice";
 import type { Message } from "@/components/sections/chat-section/types";
+import type { RecommendedProductsPayload } from "@/types";
 
 interface UseChatHookOptions {
   messages: Message[];
@@ -17,6 +19,11 @@ interface UseChatHookOptions {
   productsList: Array<{ messageId: string; isVisible?: boolean }>;
   conversationId: string | null;
   onProductsVisibilityChange?: (visible: boolean) => void;
+  /** When set (signed-in), saves recommendations on the assistant message in the API */
+  persistRecommendedProducts?: (
+    messageId: string,
+    payload: RecommendedProductsPayload
+  ) => Promise<void>;
 }
 
 interface UseChatHookReturn {
@@ -44,6 +51,7 @@ export function useChatHook({
   productsList,
   conversationId,
   onProductsVisibilityChange,
+  persistRecommendedProducts,
 }: UseChatHookOptions): UseChatHookReturn {
   const dispatch = useDispatch<AppDispatch>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -161,7 +169,15 @@ export function useChatHook({
       setNoProductsFoundFor(null);
 
       try {
-        const response = await fetchProducts({ message: messageContent });
+        const messageHistory = messages
+          .filter((msg) => msg.senderId === "user" || msg.senderId === "assistant")
+          .slice(-6)
+          .map((msg) => ({
+            senderId: msg.senderId,
+            content: msg.content,
+          }));
+
+        const response = await fetchProducts({ messages: messageHistory });
         if (isActionError(response)) {
           console.error("Error fetching products:", response);
           setLoadingProducts(null);
@@ -169,20 +185,39 @@ export function useChatHook({
         }
 
         if (response && response.products && response.products.length > 0) {
-          // Save products to Redux
+          const payload: RecommendedProductsPayload = {
+            count: response.count,
+            category: response.category ?? "",
+            products: response.products,
+          };
           dispatch(
             addProducts({
               conversationId,
               products: {
-                category: response.category,
-                count: response.count,
-                products: response.products,
+                category: payload.category,
+                count: payload.count,
+                products: payload.products,
                 messageId: assistantMessageId,
                 isVisible: true,
               },
             })
           );
+          dispatch(
+            updateMessage({
+              id: assistantMessageId,
+              conversationId,
+              updates: { recommendedProducts: payload },
+            })
+          );
           onProductsVisibilityChange?.(true);
+
+          if (persistRecommendedProducts) {
+            try {
+              await persistRecommendedProducts(assistantMessageId, payload);
+            } catch (err) {
+              console.error("Failed to persist recommended products:", err);
+            }
+          }
 
           // Trigger scroll to bottom for NEW recommended products
           setNewProductsFetched(true);
@@ -201,7 +236,13 @@ export function useChatHook({
         setLoadingProducts(null);
       }
     },
-    [conversationId, dispatch, onProductsVisibilityChange]
+    [
+      conversationId,
+      dispatch,
+      messages,
+      onProductsVisibilityChange,
+      persistRecommendedProducts,
+    ]
   );
 
   // Hide products (collapse)

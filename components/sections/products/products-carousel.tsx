@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Product {
-  id: number | string;
+  id?: number | string;
   name: string;
   slug?: string;
   permalink?: string;
@@ -14,10 +14,27 @@ interface Product {
   sale_price?: string;
   stock_quantity?: number | null;
   stock_status?: "instock" | "outofstock" | string;
+  in_stock?: boolean;
   on_sale?: boolean;
-  images?: Array<{ src: string }>;
+  images?: Array<string | { src: string }>;
   brand?: string;
   category?: string;
+}
+
+function getFirstImageSrc(product: Product): string | null {
+  const first = product.images?.[0];
+  if (!first) return null;
+  if (typeof first === "string" && first.trim()) return first;
+  if (typeof first === "object" && first?.src) return first.src;
+  return null;
+}
+
+function isInStock(product: Product): boolean {
+  if (product.in_stock === false) return false;
+  if (product.stock_status === "outofstock") return false;
+  if (product.in_stock === true) return true;
+  if (product.stock_status === "instock") return true;
+  return true;
 }
 
 interface ProductsCarouselProps {
@@ -114,16 +131,22 @@ export default function ProductsCarousel({
             }
           `}</style>
 
-          {products.map((product) => (
+          {products.map((product, index) => {
+            const imageSrc = getFirstImageSrc(product);
+            return (
             <div
-              key={product.id}
+              key={
+                product.id ??
+                product.permalink ??
+                `${product.name}-${index}`
+              }
               className="flex-shrink-0 snap-start w-[75vw] max-w-[280px] sm:w-72 sm:max-w-none md:w-64 bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
               {/* Image */}
               <div className="relative bg-muted aspect-square flex items-center justify-center overflow-hidden">
-                {product.images?.[0]?.src ? (
+                {imageSrc ? (
                   <img
-                    src={product.images[0].src}
+                    src={imageSrc}
                     alt={product.name}
                     className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                   />
@@ -164,23 +187,27 @@ export default function ProductsCarousel({
                     </p>
                   )}
 
-                  {/* Price */}
-                  <div className="mt-2">
-                    {product.on_sale && product.sale_price ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-primary">
-                          £{product.sale_price}
+                  {/* Price — omit row when API returns empty string */}
+                  {(product.on_sale && product.sale_price) ||
+                  (product.price != null &&
+                    String(product.price).trim() !== "") ? (
+                    <div className="mt-2">
+                      {product.on_sale && product.sale_price ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-primary">
+                            £{product.sale_price}
+                          </span>
+                          <span className="text-xs text-muted-foreground line-through">
+                            £{product.regular_price}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-base font-bold text-foreground">
+                          £{product.price}
                         </span>
-                        <span className="text-xs text-muted-foreground line-through">
-                          £{product.regular_price}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-base font-bold text-foreground">
-                        £{product.price}
-                      </span>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Stock + CTA */}
@@ -188,14 +215,12 @@ export default function ProductsCarousel({
                   <span
                     className={cn(
                       "text-xs font-medium px-2 py-1 rounded-full",
-                      product.stock_status === "instock"
+                      isInStock(product)
                         ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                     )}
                   >
-                    {product.stock_status === "instock"
-                      ? "In Stock"
-                      : "Out of Stock"}
+                    {isInStock(product) ? "In Stock" : "Out of Stock"}
                   </span>
 
                   <a
@@ -209,7 +234,8 @@ export default function ProductsCarousel({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Scroll Right Button */}

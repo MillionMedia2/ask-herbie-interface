@@ -14,13 +14,19 @@ import {
   removeMessage,
   setMessages,
 } from "@/redux/features/messages-slice";
+import { addProducts, clearProducts } from "@/redux/features/products-slice";
 import { logWordPressUserInfo } from "@/api/userInfo";
 import {
   fetchConversations,
   createConversation,
 } from "@/services/api/conversations";
-import { fetchMessages, createMessage } from "@/services/api/messages";
+import {
+  fetchMessages,
+  createMessage,
+  patchMessageRecommendedProducts,
+} from "@/services/api/messages";
 import { isActionError } from "@/lib/error";
+import type { RecommendedProductsPayload } from "@/types";
 
 export interface UserInfo {
   id: number;
@@ -120,9 +126,7 @@ export function useChatSection() {
       return; // Already fetched, don't fetch again
     }
 
-    // Check if messages already exist in Redux (from a previous session or creation)
-    if (messages && messages.length > 0) {
-      fetchedConversations.current.add(activeConversationId);
+    if (activeConversationId.startsWith("temp-")) {
       return;
     }
 
@@ -131,13 +135,34 @@ export function useChatSection() {
       try {
         const result = await fetchMessages(activeConversationId);
         if (!isActionError(result) && Array.isArray(result)) {
+          dispatch(clearProducts(activeConversationId));
           dispatch(
             setMessages({
               conversationId: activeConversationId,
               messages: result,
             })
           );
-          // Mark as fetched after successful fetch
+          for (const msg of result) {
+            const rp = msg.recommendedProducts;
+            if (
+              msg.senderId === "assistant" &&
+              rp?.products &&
+              rp.products.length > 0
+            ) {
+              dispatch(
+                addProducts({
+                  conversationId: activeConversationId,
+                  products: {
+                    category: rp.category ?? "",
+                    count: rp.count,
+                    products: rp.products,
+                    messageId: msg.id,
+                    isVisible: true,
+                  },
+                })
+              );
+            }
+          }
           fetchedConversations.current.add(activeConversationId);
         }
       } catch (error) {
@@ -960,6 +985,18 @@ export function useChatSection() {
     setShowSuggestions(true);
   }, []);
 
+  const persistRecommendedProducts = useCallback(
+    async (messageId: string, payload: RecommendedProductsPayload) => {
+      if (!userInfo) return;
+      if (!/^[a-f0-9]{24}$/i.test(messageId)) return;
+      const result = await patchMessageRecommendedProducts(messageId, payload);
+      if (isActionError(result)) {
+        console.error("Failed to persist recommended products:", result);
+      }
+    },
+    [userInfo]
+  );
+
   return {
     // State
     activeConversationId,
@@ -982,5 +1019,6 @@ export function useChatSection() {
     handleConversationClick,
     handleRegenerateResponse,
     handleEmptyConversations,
+    persistRecommendedProducts,
   };
 }
