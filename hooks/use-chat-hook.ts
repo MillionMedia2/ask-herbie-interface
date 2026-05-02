@@ -22,7 +22,7 @@ interface UseChatHookOptions {
   /** When set (signed-in), saves recommendations on the assistant message in the API */
   persistRecommendedProducts?: (
     messageId: string,
-    payload: RecommendedProductsPayload
+    payload: RecommendedProductsPayload,
   ) => Promise<void>;
 }
 
@@ -38,7 +38,7 @@ interface UseChatHookReturn {
   getProductsForMessage: (messageId: string) => any;
   handleShowProducts: (
     messageContent: string,
-    assistantMessageId: string
+    assistantMessageId: string,
   ) => Promise<void>;
   handleHideProducts: (messageId: string) => void;
   handleShowProductsFromRedux: (messageId: string) => void;
@@ -67,7 +67,7 @@ export function useChatHook({
   const [thinkingText, setThinkingText] = useState(THINKING_TEXTS[0]);
   const [loadingProducts, setLoadingProducts] = useState<string | null>(null);
   const [noProductsFoundFor, setNoProductsFoundFor] = useState<string | null>(
-    null
+    null,
   );
   const [newProductsFetched, setNewProductsFetched] = useState(false);
 
@@ -76,7 +76,7 @@ export function useChatHook({
     if (!isLoading) return;
     const interval = setInterval(() => {
       setThinkingText(
-        THINKING_TEXTS[Math.floor(Math.random() * THINKING_TEXTS.length)]
+        THINKING_TEXTS[Math.floor(Math.random() * THINKING_TEXTS.length)],
       );
     }, 2000);
     return () => clearInterval(interval);
@@ -87,7 +87,7 @@ export function useChatHook({
     (messageId: string) => {
       return productsList.find((p) => p.messageId === messageId);
     },
-    [productsList]
+    [productsList],
   );
 
   // Check if user is near the bottom
@@ -138,7 +138,7 @@ export function useChatHook({
         });
       }
     },
-    [isNearBottom, animatingMessageId]
+    [isNearBottom, animatingMessageId],
   );
 
   // Scroll to specific element (for showing hidden products)
@@ -157,7 +157,7 @@ export function useChatHook({
         behavior: "smooth",
       });
     },
-    []
+    [],
   );
 
   // Handle "View Recommended Products" button click
@@ -170,14 +170,17 @@ export function useChatHook({
 
       try {
         const messageHistory = messages
-          .filter((msg) => msg.senderId === "user" || msg.senderId === "assistant")
-          .slice(-6)
+          .filter(
+            (msg) => msg.senderId === "user" || msg.senderId === "assistant",
+          )
+          .slice(-4)
           .map((msg) => ({
             senderId: msg.senderId,
             content: msg.content,
           }));
 
         const response = await fetchProducts({ messages: messageHistory });
+        console.log("response", response);
         if (isActionError(response)) {
           console.error("Error fetching products:", response);
           setLoadingProducts(null);
@@ -200,14 +203,14 @@ export function useChatHook({
                 messageId: assistantMessageId,
                 isVisible: true,
               },
-            })
+            }),
           );
           dispatch(
             updateMessage({
               id: assistantMessageId,
               conversationId,
               updates: { recommendedProducts: payload },
-            })
+            }),
           );
           onProductsVisibilityChange?.(true);
 
@@ -242,7 +245,7 @@ export function useChatHook({
       messages,
       onProductsVisibilityChange,
       persistRecommendedProducts,
-    ]
+    ],
   );
 
   // Hide products (collapse)
@@ -254,11 +257,11 @@ export function useChatHook({
           conversationId,
           messageId,
           isVisible: false,
-        })
+        }),
       );
       onProductsVisibilityChange?.(false);
     },
-    [conversationId, dispatch, onProductsVisibilityChange]
+    [conversationId, dispatch, onProductsVisibilityChange],
   );
 
   // Show products from Redux (already fetched, just hidden)
@@ -270,7 +273,7 @@ export function useChatHook({
           conversationId,
           messageId,
           isVisible: true,
-        })
+        }),
       );
       onProductsVisibilityChange?.(true);
 
@@ -282,7 +285,7 @@ export function useChatHook({
         }
       }, 150);
     },
-    [conversationId, dispatch, onProductsVisibilityChange, scrollToElement]
+    [conversationId, dispatch, onProductsVisibilityChange, scrollToElement],
   );
 
   // Track user manual scrolling

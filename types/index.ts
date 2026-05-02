@@ -1,8 +1,20 @@
 export interface Product {
   id?: number | string;
   name: string;
+  /** Monograph / knowledge-base style payloads (same recommend-products API) */
+  title?: string;
+  docCanonicalId?: string;
+  sectionHeading?: string;
+  sectionKey?: string;
+  taxonomy_path?: string;
+  supplier?: string;
+  sku?: string;
+  /** Long markdown excerpt from retrieval; optional */
+  text?: string;
+  /** Human-readable multi-line summary from API */
+  display?: string;
   slug?: string;
-  permalink: string;
+  permalink?: string;
   price?: string;
   regular_price?: string;
   sale_price?: string;
