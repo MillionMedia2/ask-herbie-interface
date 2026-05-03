@@ -4,6 +4,7 @@ import ChatHeader from "./chat-header";
 import ChatMessages from "./chat-messages";
 import ChatInput from "./chat-input";
 import { SUGGESTIONS } from "@/constants/suggestions";
+import type { RecommendedProductsPayload } from "@/types";
 
 interface Props {
   messages: any[];
@@ -22,6 +23,10 @@ interface Props {
     username: string;
   } | null;
   loadingMessages?: boolean;
+  persistRecommendedProducts?: (
+    messageId: string,
+    payload: RecommendedProductsPayload
+  ) => Promise<void>;
 }
 
 export default function ChatMainCard({
@@ -36,6 +41,7 @@ export default function ChatMainCard({
   conversationTitle,
   userInfo,
   loadingMessages = false,
+  persistRecommendedProducts,
 }: Props) {
   const hasMessages = messages?.length > 0;
 
@@ -125,6 +131,7 @@ export default function ChatMainCard({
             isLoading={isLoading}
             animatingMessageId={streamingMessageId}
             onRegenerateResponse={onRegenerateResponse}
+            persistRecommendedProducts={persistRecommendedProducts}
           />
         )}
       </div>
