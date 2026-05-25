@@ -27,6 +27,7 @@ export default function ChatSection() {
     handleConversationClick,
     handleRegenerateResponse,
     handleEmptyConversations,
+    persistRecommendedProducts,
   } = useChatSection();
 
   return (
@@ -75,6 +76,7 @@ export default function ChatSection() {
           conversationTitle={activeConversation?.title || "Chat"}
           userInfo={userInfo}
           loadingMessages={!!loadingMessages}
+          persistRecommendedProducts={persistRecommendedProducts}
         />
       </div>
 

@@ -6,6 +6,7 @@ import ProductsCarousel from "../products/products-carousel";
 import { Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import type { Message } from "./types";
 import { useChatHook } from "@/hooks/use-chat-hook";
+import type { RecommendedProductsPayload } from "@/types";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -13,6 +14,10 @@ interface ChatMessagesProps {
   animatingMessageId: string | null;
   onProductsVisibilityChange?: (visible: boolean) => void;
   onRegenerateResponse?: (userMessage: string) => void;
+  persistRecommendedProducts?: (
+    messageId: string,
+    payload: RecommendedProductsPayload
+  ) => Promise<void>;
 }
 
 export default function ChatMessages({
@@ -21,6 +26,7 @@ export default function ChatMessages({
   animatingMessageId,
   onProductsVisibilityChange,
   onRegenerateResponse,
+  persistRecommendedProducts,
 }: ChatMessagesProps) {
   const conversationId = messages[0]?.conversationId || null;
   const productsListRaw = useAppSelector((state) =>
@@ -48,6 +54,7 @@ export default function ChatMessages({
     productsList,
     conversationId,
     onProductsVisibilityChange,
+    persistRecommendedProducts,
   });
 
   return (
@@ -65,6 +72,19 @@ export default function ChatMessages({
             }
 
             const productsForThisMessage = getProductsForMessage(message.id);
+            const productsForDisplay =
+              productsForThisMessage ??
+              (message.recommendedProducts?.products?.length
+                ? {
+                    category: message.recommendedProducts.category ?? "",
+                    count: message.recommendedProducts.count,
+                    products: message.recommendedProducts.products,
+                    messageId: message.id,
+                    isVisible: true as boolean | undefined,
+                  }
+                : undefined);
+            const hasMessageLevelProducts =
+              !!message.recommendedProducts?.products?.length;
             const isLastMessage = index === messages.length - 1;
             const isAssistantMessage = message.senderId === "assistant";
             const isMessageComplete = message.content.trim().length > 0;
@@ -72,10 +92,13 @@ export default function ChatMessages({
             const isStreamingThisMessage = animatingMessageId === message.id;
 
             const canShowButton = isMessageComplete && !isStreamingThisMessage;
+            const hasAnyProductsForTurn =
+              !!productsForThisMessage ||
+              hasMessageLevelProducts;
             const shouldShowButton =
               isLastMessage &&
               isAssistantMessage &&
-              !productsForThisMessage &&
+              !hasAnyProductsForTurn &&
               canShowButton;
 
             return (
@@ -149,23 +172,23 @@ export default function ChatMessages({
                 )}
 
                 {/* Products display */}
-                {productsForThisMessage && (
+                {productsForDisplay && (
                   <div
                     ref={(el) => {
                       productsRefs.current[message.id] = el;
                     }}
                     className={`mt-4 w-full max-sm:max-w-[calc(100vw-1.6rem)] overflow-hidden transition-all duration-500 ease-in-out transform origin-top ${
-                      productsForThisMessage.isVisible !== false
+                      productsForDisplay.isVisible !== false
                         ? "opacity-100 translate-y-0 scale-y-100"
                         : "opacity-0 -translate-y-4 scale-y-95"
                     }`}
                     style={{
                       maxHeight:
-                        productsForThisMessage.isVisible !== false
+                        productsForDisplay.isVisible !== false
                           ? "1000px"
                           : "0px",
                       overflow:
-                        productsForThisMessage.isVisible !== false
+                        productsForDisplay.isVisible !== false
                           ? "visible"
                           : "hidden",
                     }}
@@ -186,12 +209,14 @@ export default function ChatMessages({
                         </button>
                       </div>
                       <p className="text-sm text-muted-foreground mb-4">
-                        {productsForThisMessage.category} •{" "}
-                        {productsForThisMessage.count} products found
+                        {productsForDisplay.category
+                          ? `${productsForDisplay.category} • `
+                          : ""}
+                        {productsForDisplay.count} products found
                       </p>
                       <div className="w-full overflow-hidden">
                         <ProductsCarousel
-                          products={productsForThisMessage.products}
+                          products={productsForDisplay.products}
                           title=""
                           subtitle=""
                         />
