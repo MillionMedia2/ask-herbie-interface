@@ -93,11 +93,9 @@ export default function ProductsCarousel({
 
   const addToCart = useCallback(async (product: Product, productKey: string) => {
     const wooId = getWooId(product);
-    console.log("wooId", wooId);
     if (!wooId) return;
 
     const storeOrigin = getWooCommerceOrigin();
-    console.log("storeOrigin", storeOrigin);
     if (!storeOrigin) {
       toast.error("Store URL is not configured");
       return;
