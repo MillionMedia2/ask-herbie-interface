@@ -180,9 +180,7 @@ export function useChatHook({
           }));
 
         const response = await fetchProducts({ messages: messageHistory });
-        console.log("response", response);
         if (isActionError(response)) {
-          console.error("Error fetching products:", response);
           setLoadingProducts(null);
           return;
         }
@@ -217,8 +215,8 @@ export function useChatHook({
           if (persistRecommendedProducts) {
             try {
               await persistRecommendedProducts(assistantMessageId, payload);
-            } catch (err) {
-              console.error("Failed to persist recommended products:", err);
+            } catch {
+              // Persist failed silently; products remain in local state
             }
           }
 
@@ -226,15 +224,14 @@ export function useChatHook({
           setNewProductsFetched(true);
           setTimeout(() => setNewProductsFetched(false), 600);
         } else {
-          console.log("No products found");
           setNoProductsFoundFor(assistantMessageId);
           // Auto-hide the "no products" message after 5 seconds
           setTimeout(() => {
             setNoProductsFoundFor(null);
           }, 5000);
         }
-      } catch (error) {
-        console.error("Error fetching products:", error);
+      } catch {
+        // Fetch failed; loading state cleared in finally
       } finally {
         setLoadingProducts(null);
       }

@@ -139,8 +139,8 @@ export default function ChatSidebar({
           onNewConversation?.();
         }
       }
-    } catch (error) {
-      console.error("Failed to delete conversation:", error);
+    } catch {
+      // Delete failed
     }
 
     setIsDeleteDialogOpen(false);
@@ -184,8 +184,8 @@ export default function ChatSidebar({
           dispatch(setConversations(conversationsResult));
         }
       }
-    } catch (error) {
-      console.error("Failed to pin conversation:", error);
+    } catch {
+      // Pin failed
     }
   };
 
@@ -218,8 +218,8 @@ export default function ChatSidebar({
             dispatch(setConversations(conversationsResult));
           }
         }
-      } catch (error) {
-        console.error("Failed to rename conversation:", error);
+      } catch {
+        // Rename failed
       } finally {
         setRenamingId(null);
         setEditingId(null);
