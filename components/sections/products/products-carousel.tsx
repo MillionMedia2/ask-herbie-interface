@@ -107,7 +107,7 @@ export default function ProductsCarousel({
         {
           type: "ADD_TO_CART",
           payload: {
-            product_id: wooId,
+            product_id: product.id,
             quantity: 1,
           },
         },
