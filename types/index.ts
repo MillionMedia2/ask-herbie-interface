@@ -1,6 +1,8 @@
 export interface Product {
   id?: number | string;
   name: string;
+  /** WooCommerce numeric product ID (for add-to-cart) */
+  wooProductId?: number;
   /** Monograph / knowledge-base style payloads (same recommend-products API) */
   title?: string;
   docCanonicalId?: string;

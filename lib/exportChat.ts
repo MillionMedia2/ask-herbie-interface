@@ -129,8 +129,7 @@ export async function exportChatAsPDF(
     doc.save(
       `${conversationTitle.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.pdf`
     );
-  } catch (error) {
-    console.error("Error generating PDF:", error);
+  } catch {
     throw new Error(
       "Failed to generate PDF. Please try exporting as TXT instead."
     );

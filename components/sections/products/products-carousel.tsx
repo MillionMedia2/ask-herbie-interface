@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronLeft, ChevronRight, ShoppingCart, Loader2, Check } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
+import { WORDPRESS_URL } from "@/constants/constants";
 
 function getFirstImageSrc(product: Product): string | null {
   const first = product.images?.[0];
@@ -54,6 +56,21 @@ function isGenericShopPermalink(url: string | undefined): boolean {
   }
 }
 
+function getWooCommerceOrigin(): string | null {
+  if (!WORDPRESS_URL?.trim()) return null;
+  try {
+    return new URL(WORDPRESS_URL).origin;
+  } catch {
+    return null;
+  }
+}
+
+function getWooId(product: Product): number | null {
+  if (typeof product.wooProductId === "number") return product.wooProductId;
+  if (typeof product.id === "number") return product.id;
+  return null;
+}
+
 interface ProductsCarouselProps {
   products: Product[];
   title?: string;
@@ -70,7 +87,46 @@ export default function ProductsCarousel({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [cartLoading, setCartLoading] = useState<Record<string, boolean>>({});
+  const [cartAdded, setCartAdded] = useState<Record<string, boolean>>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const addToCart = useCallback(async (product: Product, productKey: string) => {
+    const wooId = getWooId(product);
+    if (!wooId) return;
+
+    const storeOrigin = getWooCommerceOrigin();
+    if (!storeOrigin) {
+      toast.error("Store URL is not configured");
+      return;
+    }
+
+    setCartLoading((prev) => ({ ...prev, [productKey]: true }));
+    try {
+      window.parent.postMessage(
+        {
+          type: "ADD_TO_CART",
+          payload: {
+            product_id: wooId,
+            quantity: 1,
+          },
+        },
+        storeOrigin,
+      );
+
+      setCartAdded((prev) => ({ ...prev, [productKey]: true }));
+      toast.success(`${getDisplayName(product)} added to cart`);
+      setTimeout(
+        () => setCartAdded((prev) => ({ ...prev, [productKey]: false })),
+        2500,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not add to cart";
+      toast.error(msg);
+    } finally {
+      setCartLoading((prev) => ({ ...prev, [productKey]: false }));
+    }
+  }, []);
 
   const updateScrollButtons = () => {
     const container = containerRef.current;
@@ -160,6 +216,8 @@ export default function ProductsCarousel({
             const permalink = product.permalink?.trim();
             const genericLink = isGenericShopPermalink(permalink);
             const showPrice = hasMeaningfulPrice(product);
+            const wooId = getWooId(product);
+            const canAddToCart = wooId !== null;
 
             return (
               <div
@@ -242,28 +300,62 @@ export default function ProductsCarousel({
                     )}
                   </div>
 
-                  <div className="mt-auto flex items-center justify-between border-t border-border pt-3 gap-2">
-                    <span
-                      className={cn(
-                        "text-xs font-medium px-2 py-1 rounded-full shrink-0",
-                        isInStock(product)
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-                      )}
-                    >
-                      {isInStock(product) ? "In Stock" : "Out of Stock"}
-                    </span>
-
-                    {permalink ? (
-                      <a
-                        href={permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-semibold text-primary hover:underline text-right truncate"
-                        title={permalink}
+                  <div className="mt-auto border-t border-border pt-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full shrink-0",
+                          isInStock(product)
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+                        )}
                       >
-                        {genericLink ? "Supplier shop →" : "View →"}
-                      </a>
+                        {isInStock(product) ? "In Stock" : "Out of Stock"}
+                      </span>
+
+                      {permalink ? (
+                        <a
+                          href={permalink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-primary hover:underline text-right truncate"
+                          title={permalink}
+                        >
+                          {genericLink ? "Supplier shop →" : "View →"}
+                        </a>
+                      ) : null}
+                    </div>
+
+                    {canAddToCart && isInStock(product) ? (
+                      <button
+                        type="button"
+                        disabled={cartLoading[productKey] || cartAdded[productKey]}
+                        onClick={() => addToCart(product, productKey)}
+                        className={cn(
+                          "flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-xs font-semibold transition-all",
+                          cartAdded[productKey]
+                            ? "bg-green-600 text-white"
+                            : "bg-primary text-primary-foreground hover:opacity-90",
+                          (cartLoading[productKey] || cartAdded[productKey]) && "opacity-80 cursor-not-allowed",
+                        )}
+                      >
+                        {cartLoading[productKey] ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Adding…
+                          </>
+                        ) : cartAdded[productKey] ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Added!
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            Add to Cart
+                          </>
+                        )}
+                      </button>
                     ) : null}
                   </div>
                 </div>
