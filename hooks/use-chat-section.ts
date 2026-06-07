@@ -991,7 +991,7 @@ export function useChatSection() {
       if (!/^[a-f0-9]{24}$/i.test(messageId)) return;
       const result = await patchMessageRecommendedProducts(messageId, payload);
       if (isActionError(result)) {
-        console.error("Failed to persist recommended products:", result);
+        return;
       }
     },
     [userInfo]

@@ -126,7 +126,6 @@ export const askAIStream = async ({
             if (data && !data.startsWith("{") && !data.startsWith("[")) {
               onChunk(data);
             } else {
-              console.error("Failed to parse SSE data:", e, "Data:", data);
               const error: any =
                 e instanceof Error ? e : new Error("Failed to parse SSE data");
               const handledError = handleApiErrorWithoutException(error);
