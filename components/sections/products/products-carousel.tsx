@@ -93,9 +93,11 @@ export default function ProductsCarousel({
 
   const addToCart = useCallback(async (product: Product, productKey: string) => {
     const wooId = getWooId(product);
+    console.log("wooId", wooId);
     if (!wooId) return;
 
     const storeOrigin = getWooCommerceOrigin();
+    console.log("storeOrigin", storeOrigin);
     if (!storeOrigin) {
       toast.error("Store URL is not configured");
       return;
@@ -107,7 +109,7 @@ export default function ProductsCarousel({
         {
           type: "ADD_TO_CART",
           payload: {
-            product_id: product.id,
+            product_id: wooId,
             quantity: 1,
           },
         },
