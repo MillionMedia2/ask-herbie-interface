@@ -1,16 +1,21 @@
 "use client";
 
-import { SUGGESTIONS } from "@/constants/suggestions";
+import { getSuggestionsForPersona } from "@/constants/personas";
+import type { PersonaId } from "@/constants/personas";
 
 interface Props {
   isLoading: boolean;
   onQuestionClick: (question: string) => void;
+  persona: PersonaId;
 }
 
 export default function ChatSuggestionsCard({
   isLoading,
   onQuestionClick,
+  persona,
 }: Props) {
+  const suggestions = getSuggestionsForPersona(persona);
+
   return (
     <div className="flex flex-col h-full bg-card border border-[#D0D0D0] dark:border-border rounded-[14px] shadow-[0_4px_10px_rgba(0,0,0,0.05)] p-6 w-full">
       <h2 className="mb-6 text-xl font-semibold text-foreground">
@@ -18,7 +23,7 @@ export default function ChatSuggestionsCard({
       </h2>
 
       <div className="space-y-3 overflow-y-auto">
-        {SUGGESTIONS.map((suggestion) => (
+        {suggestions.map((suggestion) => (
           <button
             key={suggestion}
             onClick={() => onQuestionClick(suggestion)}
