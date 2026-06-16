@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { exportChatAsTXT, exportChatAsPDF } from "@/lib/exportChat";
 import { IMessage } from "@/types";
+import PersonaSwitcher from "./persona-switcher";
+import type { PersonaId } from "@/constants/personas";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,9 @@ interface ChatHeaderProps {
   onSidebarToggle: () => void;
   messages?: IMessage[];
   conversationTitle?: string;
+  persona: PersonaId;
+  onPersonaChange: (persona: PersonaId) => void;
+  personaSwitchDisabled?: boolean;
   userInfo?: {
     id: number;
     name: string;
@@ -29,6 +34,9 @@ export default function ChatHeader({
   onSidebarToggle,
   messages = [],
   conversationTitle = "Chat",
+  persona,
+  onPersonaChange,
+  personaSwitchDisabled = false,
   userInfo,
 }: ChatHeaderProps) {
   const { theme, setTheme } = useTheme();
@@ -122,6 +130,11 @@ export default function ChatHeader({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PersonaSwitcher
+            persona={persona}
+            onPersonaChange={onPersonaChange}
+            disabled={personaSwitchDisabled}
+          />
           {hasMessages && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

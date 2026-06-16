@@ -19,6 +19,7 @@ export default function ChatSection() {
     // Computed
     isLoading,
     activeStreamingMessageId,
+    isPersonaSwitchDisabled,
     // Actions
     setSidebarOpen,
     startNewConversation,
@@ -27,7 +28,9 @@ export default function ChatSection() {
     handleConversationClick,
     handleRegenerateResponse,
     handleEmptyConversations,
+    handlePersonaChange,
     persistRecommendedProducts,
+    persona,
   } = useChatSection();
 
   return (
@@ -74,6 +77,9 @@ export default function ChatSection() {
           onQuestionClick={startNewConversation}
           onRegenerateResponse={handleRegenerateResponse}
           conversationTitle={activeConversation?.title || "Chat"}
+          persona={persona}
+          onPersonaChange={handlePersonaChange}
+          personaSwitchDisabled={isPersonaSwitchDisabled}
           userInfo={userInfo}
           loadingMessages={!!loadingMessages}
           persistRecommendedProducts={persistRecommendedProducts}
@@ -91,6 +97,7 @@ export default function ChatSection() {
           <ChatSuggestionsCard
             isLoading={isLoading}
             onQuestionClick={startNewConversation}
+            persona={persona}
           />
         )}
       </div>
