@@ -3,7 +3,8 @@
 import ChatHeader from "./chat-header";
 import ChatMessages from "./chat-messages";
 import ChatInput from "./chat-input";
-import { SUGGESTIONS } from "@/constants/suggestions";
+import { getPersonaConfig } from "@/constants/personas";
+import type { PersonaId } from "@/constants/personas";
 import type { RecommendedProductsPayload } from "@/types";
 
 interface Props {
@@ -16,6 +17,9 @@ interface Props {
   onQuestionClick: (question: string) => void;
   onRegenerateResponse?: (userMessage: string) => void;
   conversationTitle?: string;
+  persona: PersonaId;
+  onPersonaChange: (persona: PersonaId) => void;
+  personaSwitchDisabled?: boolean;
   userInfo?: {
     id: number;
     name: string;
@@ -39,11 +43,16 @@ export default function ChatMainCard({
   onQuestionClick,
   onRegenerateResponse,
   conversationTitle,
+  persona,
+  onPersonaChange,
+  personaSwitchDisabled = false,
   userInfo,
   loadingMessages = false,
   persistRecommendedProducts,
 }: Props) {
   const hasMessages = messages?.length > 0;
+  const personaConfig = getPersonaConfig(persona);
+  const suggestions = personaConfig.suggestions;
 
   return (
     <div className="flex flex-col h-full bg-card border border-[#D0D0D0] dark:border-border rounded-[14px] shadow-[0_4px_14px_rgba(0,0,0,0.08)] overflow-hidden">
@@ -51,6 +60,9 @@ export default function ChatMainCard({
         onSidebarToggle={onToggleSidebar}
         messages={messages}
         conversationTitle={conversationTitle}
+        persona={persona}
+        onPersonaChange={onPersonaChange}
+        personaSwitchDisabled={personaSwitchDisabled}
         userInfo={userInfo}
       />
 
@@ -83,17 +95,17 @@ export default function ChatMainCard({
               {userInfo?.name ? (
                 <>
                   Hey there {userInfo.name.split(" ")[0]}, I'm{" "}
-                  <span className="text-primary">Herbie</span>
+                  <span className="text-primary">{personaConfig.welcomeTitle}</span>
                 </>
               ) : (
                 <>
-                  Hey there, I'm <span className="text-primary">Herbie</span>
+                  Hey there, I'm{" "}
+                  <span className="text-primary">{personaConfig.welcomeTitle}</span>
                 </>
               )}
             </h2>
             <p className="max-w-md text-sm leading-relaxed mb-4">
-              I'm your AI natural remedy companion. Ask me anything about
-              remedies, recommendations, or support.
+              {personaConfig.welcomeSubtitle}
             </p>
 
             {/* Mobile suggestions - only shown on mobile */}
@@ -102,7 +114,7 @@ export default function ChatMainCard({
                 Suggestions
               </h3>
               <div className="space-y-2">
-                {SUGGESTIONS.map((suggestion) => (
+                {suggestions.map((suggestion) => (
                   <button
                     key={suggestion}
                     onClick={() => onQuestionClick(suggestion)}

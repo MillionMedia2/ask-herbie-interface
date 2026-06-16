@@ -1,10 +1,13 @@
 import { API_URL } from "@/constants/constants";
 import { handleApiErrorWithoutException } from "@/lib/errorHandler";
+import type { PersonaId } from "@/constants/personas";
+import { DEFAULT_PERSONA } from "@/constants/personas";
 
 /**
  * Stream AI response using Server-Sent Events
  * @param question - The user's question
  * @param conversationId - Optional conversation ID for maintaining context (backend's previous_response_id)
+ * @param persona - Which Herbie persona to use (default | aisha)
  * @param onChunk - Callback fired for each chunk of text received
  * @param onConversationId - Callback fired when backend returns the conversation ID
  * @param onComplete - Callback fired when streaming completes
@@ -13,6 +16,7 @@ import { handleApiErrorWithoutException } from "@/lib/errorHandler";
 export const askAIStream = async ({
   question,
   conversationId,
+  persona = DEFAULT_PERSONA,
   onChunk,
   onConversationId,
   onComplete,
@@ -20,6 +24,7 @@ export const askAIStream = async ({
 }: {
   question: string;
   conversationId?: string;
+  persona?: PersonaId;
   onChunk: (chunk: string) => void;
   onConversationId?: (conversationId: string) => void;
   onComplete: () => void;
@@ -36,7 +41,7 @@ export const askAIStream = async ({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ question, conversationId }),
+      body: JSON.stringify({ question, conversationId, persona }),
     });
 
     if (!response.ok) {

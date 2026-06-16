@@ -27,6 +27,14 @@ import {
 } from "@/services/api/messages";
 import { isActionError } from "@/lib/error";
 import type { RecommendedProductsPayload } from "@/types";
+import {
+  DEFAULT_PERSONA,
+  getPersonaConfig,
+  normalizePersona,
+  PERSONA_STORAGE_KEY,
+  type PersonaId,
+} from "@/constants/personas";
+import { toast } from "sonner";
 
 export interface UserInfo {
   id: number;
@@ -69,6 +77,7 @@ export function useChatSection() {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState<string | null>(null);
   const [initialBtnParam, setInitialBtnParam] = useState<string | null>(null);
+  const [persona, setPersona] = useState<PersonaId>(DEFAULT_PERSONA);
 
   // Refs
   const processingRef = useRef(false);
@@ -83,6 +92,15 @@ export function useChatSection() {
     streamingConversationId === activeConversationId
       ? streamingMessageId
       : null;
+  const isPersonaSwitchDisabled =
+    isLoading || activeStreamingMessageId !== null;
+
+  useEffect(() => {
+    const stored = localStorage.getItem(PERSONA_STORAGE_KEY);
+    if (stored) {
+      setPersona(normalizePersona(stored));
+    }
+  }, []);
 
   // Helper function
   const getConversationTitle = (text: string): string => {
@@ -335,6 +353,7 @@ export function useChatSection() {
         // Send query to backend WITHOUT conversationId (no persistence)
         await askAIStream({
           question,
+          persona,
           conversationId: undefined, // No conversationId for non-logged-in users
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
@@ -453,6 +472,7 @@ export function useChatSection() {
 
         await askAIStream({
           question,
+          persona,
           // New conversation, no backend conversationId yet
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
@@ -514,7 +534,7 @@ export function useChatSection() {
         setStreamingConversationId(null);
       }
     },
-    [dispatch, userInfo, token]
+    [dispatch, userInfo, token, persona]
   );
 
   // Process the initial btn param after component is ready
@@ -569,6 +589,7 @@ export function useChatSection() {
         // Send query to backend WITHOUT conversationId (no persistence)
         await askAIStream({
           question: content,
+          persona,
           conversationId: undefined, // No conversationId for non-logged-in users
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
@@ -702,6 +723,7 @@ export function useChatSection() {
 
         await askAIStream({
           question: content,
+          persona,
           conversationId: backendConversationId, // Pass backend's conversationId for conversation context
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
@@ -763,7 +785,7 @@ export function useChatSection() {
         setLoadingConversationId(null);
       }
     },
-    [activeConversationId, dispatch, userInfo, token]
+    [activeConversationId, dispatch, userInfo, token, persona]
   );
 
   const handleNewConversation = useCallback(() => {
@@ -817,6 +839,7 @@ export function useChatSection() {
         // Send query to backend WITHOUT conversationId (no persistence for non-logged-in users)
         await askAIStream({
           question: userMessage,
+          persona,
           conversationId: undefined, // No conversationId for non-logged-in users
           onChunk: (chunk: string) => {
             accumulatedContent += chunk;
@@ -912,6 +935,7 @@ export function useChatSection() {
 
       await askAIStream({
         question: userMessage,
+        persona,
         conversationId: backendConversationId || undefined,
         onChunk: (chunk: string) => {
           accumulatedContent += chunk;
@@ -977,7 +1001,35 @@ export function useChatSection() {
         },
       });
     },
-    [activeConversationId, messages, dispatch, userInfo, token]
+    [activeConversationId, messages, dispatch, userInfo, token, persona]
+  );
+
+  const handlePersonaChange = useCallback(
+    (nextPersona: PersonaId) => {
+      if (nextPersona === persona) return;
+      if (isPersonaSwitchDisabled) return;
+
+      // Drop backend thread mapping so the next message starts fresh AI context
+      // with the new persona (backend clears history when persona differs).
+      if (activeConversationId) {
+        backendConversationIds.current.delete(activeConversationId);
+      }
+
+      setPersona(nextPersona);
+      localStorage.setItem(PERSONA_STORAGE_KEY, nextPersona);
+
+      if (messages.length > 0) {
+        toast.info(
+          `Switched to ${getPersonaConfig(nextPersona).shortLabel}. Your next reply will use this companion.`,
+        );
+      }
+    },
+    [
+      persona,
+      activeConversationId,
+      isPersonaSwitchDisabled,
+      messages.length,
+    ]
   );
 
   const handleEmptyConversations = useCallback(() => {
@@ -1008,9 +1060,11 @@ export function useChatSection() {
     loadingToken,
     loadingConversations,
     loadingMessages,
+    persona,
     // Computed
     isLoading,
     activeStreamingMessageId,
+    isPersonaSwitchDisabled,
     // Actions
     setSidebarOpen,
     startNewConversation,
@@ -1019,6 +1073,7 @@ export function useChatSection() {
     handleConversationClick,
     handleRegenerateResponse,
     handleEmptyConversations,
+    handlePersonaChange,
     persistRecommendedProducts,
   };
 }
